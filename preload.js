@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
   saveFilamento:     (p, f)      => ipcRenderer.invoke('save-filamento', p, f),
   deleteFilamento:   (p, n)      => ipcRenderer.invoke('delete-filamento', p, n),
   descontarFilamento:(p, n, gr)  => ipcRenderer.invoke('descontar-filamento', p, n, gr),
+  getStockMinimo:    ()          => ipcRenderer.invoke('get-stock-minimo'),
+  getAlertasStock:   (p)         => ipcRenderer.invoke('get-alertas-stock', p),
 
   // ── Impresiones ──────────────────────────────────────────
   getImpresiones:    (p)         => ipcRenderer.invoke('get-impresiones', p),

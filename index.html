@@ -423,7 +423,7 @@ tr:hover td{ background:var(--s2); }
      MODAL: FILAMENTO
 ══════════════════════════════════════ -->
 <div class="modal-backdrop" id="modalFil">
-  <div class="modal">
+  <div class="modal" style="width:580px">
     <div class="modal-title" id="modalFilTitle">Nuevo filamento</div>
     <input type="hidden" id="mFilEditIdx" value=""/>
     <div class="form-grid form-grid-2">
@@ -440,9 +440,30 @@ tr:hover td{ background:var(--s2); }
           <option value="Otro">Otro</option>
         </select>
       </div>
-      <div class="field"><label>Costo por kg ($)</label><input type="number" id="mFilCosto" step="0.01" value="0"/></div>
-      <div class="field"><label>Total en gramos</label><input type="number" id="mFilTotal" value="1000"/></div>
-      <div class="field"><label>Stock actual (gr)</label><input type="number" id="mFilStock" value="1000"/></div>
+      <div class="field"><label>Color</label>
+        <input type="color" id="mFilColor" value="#888888" style="height:38px;padding:2px 6px;"/>
+      </div>
+      <div class="field"><label>Peso de la bobina (gr)</label>
+        <input type="number" id="mFilPeso" value="1000" oninput="calcCostoKg()"/>
+      </div>
+      <div class="field"><label>Costo total de la bobina ($)</label>
+        <input type="number" id="mFilCostoTotal" step="0.01" value="0" oninput="calcCostoKg()"/>
+      </div>
+      <div class="field"><label>Costo por kg ($) — calculado</label>
+        <input type="number" id="mFilCostoKg" step="0.01" value="0" placeholder="Se calcula automáticamente"/>
+      </div>
+      <div class="field"><label>Stock actual (gr)</label>
+        <input type="number" id="mFilStock" value="1000"/>
+      </div>
+      <div class="field"><label>Fecha de compra</label>
+        <input type="date" id="mFilFechaCompra"/>
+      </div>
+      <div class="field" style="grid-column:1/-1"><label>Notas</label>
+        <input type="text" id="mFilNotas" placeholder="Ej: comprado en Amazon, lote especial..."/>
+      </div>
+    </div>
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:var(--text2);">
+      ⚠️ Se enviará alerta cuando el stock baje de <strong style="color:var(--warn)">250gr</strong>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modalFil')">Cancelar</button>
@@ -471,6 +492,51 @@ async function init () {
   await loadImpresiones()
   renderDashboard()
   populateFilSelect()
+  // Verificar alertas de stock al arrancar
+  await checkAlertasStock()
+}
+
+async function checkAlertasStock () {
+  if (!cfg.rutaExcel) return
+  const alertas = await api.getAlertasStock(cfg.rutaExcel)
+  if (alertas.length > 0) {
+    mostrarBannerAlertas(alertas)
+  }
+}
+
+function mostrarBannerAlertas (alertas) {
+  const existing = document.getElementById('bannerAlertas')
+  if (existing) existing.remove()
+  const banner = document.createElement('div')
+  banner.id = 'bannerAlertas'
+  banner.style.cssText = `
+    position:fixed; bottom:16px; right:16px; z-index:200;
+    background:#1C1208; border:1px solid var(--warn);
+    border-radius:10px; padding:14px 18px; max-width:340px;
+    box-shadow:0 4px 20px rgba(0,0,0,.5);
+    animation:fadeIn .3s ease;
+  `
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:16px">⚠️</span>
+      <span style="font-size:12px;font-weight:700;color:var(--warn)">STOCK BAJO — ${alertas.length} filamento${alertas.length>1?'s':''}</span>
+      <button onclick="this.parentElement.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
+    </div>
+    ${alertas.map(a => `
+      <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+        <div style="width:10px;height:10px;border-radius:50%;background:${a.color};flex-shrink:0;"></div>
+        <span style="font-size:11px;color:var(--text);flex:1">${a.nombre}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--error)">${a.stockGr}gr</span>
+      </div>`).join('')}
+    <button onclick="showPage('filamentos');this.parentElement.remove()" style="
+      margin-top:10px;width:100%;background:rgba(210,153,34,.15);
+      border:1px solid var(--warn);border-radius:6px;padding:6px;
+      color:var(--warn);font-family:'Syne',sans-serif;font-size:11px;
+      font-weight:700;cursor:pointer;">Ver filamentos →</button>
+  `
+  document.body.appendChild(banner)
+  // Auto-cerrar después de 8 segundos
+  setTimeout(() => { if (banner.parentElement) banner.remove() }, 8000)
 }
 init()
 
@@ -577,45 +643,70 @@ function renderDashboardFilamentos () {
 
 function openModalFil () {
   document.getElementById('modalFilTitle').textContent = 'Nuevo filamento'
-  document.getElementById('mFilEditIdx').value = ''
-  document.getElementById('mFilNombre').value  = ''
-  document.getElementById('mFilMarca').value   = ''
-  document.getElementById('mFilTipo').value    = 'PLA'
-  document.getElementById('mFilCosto').value   = 0
-  document.getElementById('mFilTotal').value   = 1000
-  document.getElementById('mFilStock').value   = 1000
+  document.getElementById('mFilEditIdx').value    = ''
+  document.getElementById('mFilNombre').value     = ''
+  document.getElementById('mFilMarca').value      = ''
+  document.getElementById('mFilTipo').value       = 'PLA'
+  document.getElementById('mFilColor').value      = '#888888'
+  document.getElementById('mFilPeso').value       = 1000
+  document.getElementById('mFilCostoTotal').value = 0
+  document.getElementById('mFilCostoKg').value    = 0
+  document.getElementById('mFilStock').value      = 1000
+  document.getElementById('mFilFechaCompra').value= new Date().toISOString().split('T')[0]
+  document.getElementById('mFilNotas').value      = ''
   openModal('modalFil')
+}
+
+function calcCostoKg () {
+  const peso  = parseFloat(document.getElementById('mFilPeso').value)       || 0
+  const costo = parseFloat(document.getElementById('mFilCostoTotal').value) || 0
+  if (peso > 0 && costo > 0) {
+    document.getElementById('mFilCostoKg').value = ((costo / peso) * 1000).toFixed(2)
+  }
 }
 
 function editFilamento (idx) {
   const f = filamentos[idx]
   document.getElementById('modalFilTitle').textContent = 'Editar filamento'
-  document.getElementById('mFilEditIdx').value = idx
-  document.getElementById('mFilNombre').value  = f.nombre
-  document.getElementById('mFilMarca').value   = f.marca  || ''
-  document.getElementById('mFilTipo').value    = f.tipo   || 'PLA'
-  document.getElementById('mFilCosto').value   = f.costoKg
-  document.getElementById('mFilTotal').value   = f.totalGr
-  document.getElementById('mFilStock').value   = f.stockGr
+  document.getElementById('mFilEditIdx').value    = idx
+  document.getElementById('mFilNombre').value     = f.nombre
+  document.getElementById('mFilMarca').value      = f.marca       || ''
+  document.getElementById('mFilTipo').value       = f.tipo        || 'PLA'
+  document.getElementById('mFilColor').value      = f.color       || '#888888'
+  document.getElementById('mFilPeso').value       = f.pesoBobina  || 1000
+  document.getElementById('mFilCostoTotal').value = f.costoTotal  || 0
+  document.getElementById('mFilCostoKg').value    = f.costoKg     || 0
+  document.getElementById('mFilStock').value      = f.stockGr     || 0
+  document.getElementById('mFilFechaCompra').value= f.fechaCompra || ''
+  document.getElementById('mFilNotas').value      = f.notas       || ''
   openModal('modalFil')
 }
 
 async function saveFilamento () {
   const nombre = document.getElementById('mFilNombre').value.trim()
   if (!nombre) { alert('El nombre es obligatorio.'); return }
-  const editIdx = document.getElementById('mFilEditIdx').value
+  const editIdx    = document.getElementById('mFilEditIdx').value
+  const pesoBobina = parseFloat(document.getElementById('mFilPeso').value)       || 1000
+  const costoTotal = parseFloat(document.getElementById('mFilCostoTotal').value) || 0
+  const costoKg    = parseFloat(document.getElementById('mFilCostoKg').value)    || 0
+  const stockInput = parseFloat(document.getElementById('mFilStock').value)
   await api.saveFilamento(cfg.rutaExcel, {
     nombre,
-    marca:   document.getElementById('mFilMarca').value.trim(),
-    tipo:    document.getElementById('mFilTipo').value,
-    costoKg: parseFloat(document.getElementById('mFilCosto').value) || 0,
-    totalGr: parseFloat(document.getElementById('mFilTotal').value) || 1000,
-    stockGr: parseFloat(document.getElementById('mFilStock').value) || 0,
-    _editIndex: editIdx !== '' ? parseInt(editIdx) : undefined
+    marca:       document.getElementById('mFilMarca').value.trim(),
+    tipo:        document.getElementById('mFilTipo').value,
+    color:       document.getElementById('mFilColor').value,
+    pesoBobina,
+    costoTotal,
+    costoKg,
+    stockGr:     isNaN(stockInput) ? pesoBobina : stockInput,
+    fechaCompra: document.getElementById('mFilFechaCompra').value,
+    notas:       document.getElementById('mFilNotas').value.trim(),
+    _editIndex:  editIdx !== '' ? parseInt(editIdx) : undefined
   })
   closeModal('modalFil')
   await loadFilamentos()
   populateFilSelect()
+  await checkAlertasStock()
 }
 
 async function deleteFilamento (nombre) {
@@ -724,7 +815,7 @@ async function saveImpresion () {
   if (!desc) { alert('La descripción es obligatoria.'); return }
   if (!fil)  { alert('Selecciona un filamento.'); return }
   const editIdx = document.getElementById('mImpEditIdx').value
-  await api.saveImpresion(cfg.rutaExcel, {
+  const res = await api.saveImpresion(cfg.rutaExcel, {
     fecha:       document.getElementById('mImpFecha').value,
     descripcion: desc,
     filamento:   fil,
@@ -737,6 +828,15 @@ async function saveImpresion () {
   closeModal('modalImp')
   await loadImpresiones()
   await loadFilamentos()
+
+  // Mostrar alerta si el stock quedó bajo
+  if (res && res.stockBajo) {
+    mostrarBannerAlertas([{
+      nombre:  res.filamento,
+      stockGr: res.stockRestante,
+      color:   (filamentos.find(f => f.nombre === res.filamento) || {}).color || '#888'
+    }])
+  }
 }
 
 async function deleteImpresion (idx) {
