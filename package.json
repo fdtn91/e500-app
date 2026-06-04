@@ -1,0 +1,15 @@
+{
+  "name": "e500-3dprint",
+  "version": "1.0.0",
+  "description": "Control interno de impresiones 3D - E500",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>E500 3D Print</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:      #080B10;
+  --s1:      #0D1117;
+  --s2:      #161B22;
+  --s3:      #1C2128;
+  --border:  #21262D;
+  --accent:  #00D9FF;
+  --accent2: #0099CC;
+  --ok:      #3FB950;
+  --warn:    #D29922;
+  --error:   #F85149;
+  --muted:   #484F58;
+  --text:    #E6EDF3;
+  --text2:   #8B949E;
+  --purple:  #D2A8FF;
+  --orange:  #FFA657;
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{
+  font-family:'Syne',sans-serif;
+  background:var(--bg); color:var(--text);
+  height:100vh; display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* ── TITLEBAR ── */
+#titlebar{
+  -webkit-app-region:drag;
+  height:38px; background:var(--s1);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px; flex-shrink:0;
+}
+.tb-left{ display:flex; align-items:center; gap:10px; }
+.tb-dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); }
+.tb-title{ font-size:11px; font-weight:700; letter-spacing:.1em; color:var(--text2); text-transform:uppercase; }
+.tb-ver{ font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+.win-controls{ -webkit-app-region:no-drag; display:flex; gap:6px; }
+.win-btn{ width:12px; height:12px; border-radius:50%; border:none; cursor:pointer; transition:opacity .2s; }
+.win-btn:hover{ opacity:.75; }
+.win-btn.close   { background:#FF5F57; }
+.win-btn.minimize{ background:#FFBD2E; }
+.win-btn.maximize{ background:#28C840; }
+
+/* ── LAYOUT ── */
+.app{ flex:1; display:flex; overflow:hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:200px; background:var(--s1);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  padding:20px 12px; gap:4px; flex-shrink:0;
+}
+.brand{ padding-bottom:16px; border-bottom:1px solid var(--border); margin-bottom:12px; }
+.brand-label{ font-size:9px; letter-spacing:.2em; color:var(--accent); font-weight:700; text-transform:uppercase; margin-bottom:4px; }
+.brand-name{ font-size:16px; font-weight:800; line-height:1.1; }
+.brand-sub{ font-size:10px; color:var(--text2); margin-top:4px; }
+
+.nav-btn{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 12px; border-radius:8px; border:none;
+  background:transparent; color:var(--text2);
+  font-family:'Syne',sans-serif; font-size:12px; font-weight:600;
+  cursor:pointer; transition:all .15s; text-align:left; width:100%;
+}
+.nav-btn:hover{ background:var(--s2); color:var(--text); }
+.nav-btn.active{ background:var(--s3); color:var(--accent); border:1px solid var(--border); }
+.nav-icon{ font-size:14px; flex-shrink:0; }
+.sidebar-footer{ margin-top:auto; padding-top:12px; border-top:1px solid var(--border); }
+.version-badge{ font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); text-align:center; }
+
+/* ── CONTENT ── */
+.content{ flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.page{ display:none; flex:1; overflow:hidden; flex-direction:column; }
+.page.active{ display:flex; }
+.page-header{
+  padding:20px 24px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.page-title{ font-size:20px; font-weight:800; }
+.page-sub{ font-size:11px; color:var(--text2); margin-top:2px; }
+.page-body{ flex:1; overflow-y:auto; padding:20px 24px; }
+.page-body::-webkit-scrollbar{ width:4px; }
+.page-body::-webkit-scrollbar-thumb{ background:var(--border); border-radius:2px; }
+
+/* ── CARDS ── */
+.card{ background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:14px; }
+.card-title{ font-size:10px; font-weight:700; letter-spacing:.15em; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+
+/* ── BOTONES ── */
+.btn{ border:none; border-radius:7px; font-family:'Syne',sans-serif; font-weight:700; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary{ background:var(--accent); color:#000; padding:10px 20px; font-size:12px; letter-spacing:.06em; }
+.btn-primary:hover{ background:#00EEFF; }
+.btn-primary:disabled{ background:var(--s2); color:var(--muted); cursor:not-allowed; }
+.btn-secondary{ background:var(--s2); color:var(--text2); border:1px solid var(--border); padding:8px 16px; font-size:11px; }
+.btn-secondary:hover{ background:var(--s3); color:var(--text); border-color:var(--text2); }
+.btn-danger{ background:transparent; color:var(--error); border:1px solid var(--error); padding:6px 12px; font-size:11px; }
+.btn-danger:hover{ background:var(--error); color:#fff; }
+.btn-sm{ padding:5px 10px; font-size:10px; }
+.btn-warn{ background:transparent; color:var(--warn); border:1px solid var(--warn); padding:6px 12px; font-size:11px; }
+.btn-warn:hover{ background:var(--warn); color:#000; }
+
+/* ── INPUTS ── */
+.form-grid{ display:grid; gap:12px; }
+.form-grid-2{ grid-template-columns:1fr 1fr; }
+.form-grid-3{ grid-template-columns:1fr 1fr 1fr; }
+.field{ display:flex; flex-direction:column; gap:5px; }
+.field label{ font-size:10px; font-weight:700; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; }
+.field input,.field select,.field textarea{
+  background:var(--s2); border:1px solid var(--border); border-radius:6px;
+  padding:8px 10px; color:var(--text); font-family:'JetBrains Mono',monospace;
+  font-size:12px; outline:none; transition:border-color .15s;
+}
+.field input:focus,.field select:focus,.field textarea:focus{ border-color:var(--accent); }
+.field textarea{ resize:vertical; min-height:60px; }
+.field select option{ background:var(--s2); }
+
+/* ── TABLAS ── */
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:12px; }
+th{
+  background:var(--s2); color:var(--text2); font-size:9px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; padding:8px 12px;
+  text-align:left; border-bottom:1px solid var(--border);
+}
+td{ padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:hover td{ background:var(--s2); }
+.td-mono{ font-family:'JetBrains Mono',monospace; }
+.td-actions{ display:flex; gap:6px; }
+
+/* ── BADGES ── */
+.badge{ display:inline-block; padding:2px 8px; border-radius:20px; font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.badge-ok    { background:rgba(63,185,80,.15);   color:var(--ok); }
+.badge-warn  { background:rgba(210,153,34,.15);  color:var(--warn); }
+.badge-error { background:rgba(248,81,73,.15);   color:var(--error); }
+.badge-accent{ background:rgba(0,217,255,.15);   color:var(--accent); }
+.badge-purple{ background:rgba(210,168,255,.15); color:var(--purple); }
+.badge-orange{ background:rgba(255,166,87,.15);  color:var(--orange); }
+
+/* ── MODAL ── */
+.modal-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:100; align-items:center; justify-content:center; }
+.modal-backdrop.open{ display:flex; }
+.modal{ background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:24px; width:540px; max-width:90vw; max-height:85vh; overflow-y:auto; }
+.modal-title{ font-size:16px; font-weight:800; margin-bottom:18px; }
+.modal-footer{ display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+
+/* ── STATS ── */
+.stats-row{ display:grid; gap:10px; margin-bottom:16px; }
+.stats-row-4{ grid-template-columns:repeat(4,1fr); }
+.stats-row-3{ grid-template-columns:repeat(3,1fr); }
+.stat-card{ background:var(--s1); border:1px solid var(--border); border-radius:8px; padding:14px; text-align:center; }
+.stat-num{ font-size:26px; font-weight:800; line-height:1; }
+.stat-num.c-accent{ color:var(--accent); }
+.stat-num.c-ok    { color:var(--ok); }
+.stat-num.c-warn  { color:var(--warn); }
+.stat-num.c-error { color:var(--error); }
+.stat-num.c-purple{ color:var(--purple); }
+.stat-lbl{ font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; margin-top:3px; font-weight:700; }
+
+/* ── STOCK BAR ── */
+.stock-bar{ width:100%; height:6px; background:var(--s3); border-radius:3px; overflow:hidden; }
+.stock-bar-fill{ height:100%; border-radius:3px; transition:width .3s; }
+
+/* ── PATH ITEM ── */
+.path-item{ background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:pointer; transition:border-color .2s; margin-bottom:8px; }
+.path-item:hover{ border-color:var(--accent); }
+.path-label{ font-size:9px; font-weight:700; letter-spacing:.12em; color:var(--accent); text-transform:uppercase; margin-bottom:3px; }
+.path-val{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.path-val.set{ color:var(--ok); }
+
+/* ── SUB TABS ── */
+.sub-tabs{ display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border); }
+.sub-tab{ padding:8px 16px; border-radius:6px 6px 0 0; border:none; background:transparent; color:var(--text2); font-family:'Syne',sans-serif; font-size:11px; font-weight:700; cursor:pointer; transition:all .15s; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.sub-tab:hover{ color:var(--text); }
+.sub-tab.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
+/* ── FILTROS ── */
+.filtros{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.filtro-btn{ padding:5px 12px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--text2); font-family:'Syne',sans-serif; font-size:10px; font-weight:700; cursor:pointer; transition:all .15s; }
+.filtro-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.filtro-btn.active{ background:rgba(0,217,255,.15); border-color:var(--accent); color:var(--accent); }
+
+@keyframes fadeIn{ from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+</style>
+</head>
+<body>
+
+<!-- TITLEBAR -->
+<div id="titlebar">
+  <div class="tb-left">
+    <div class="tb-dot"></div>
+    <span class="tb-title">E500 3D Print</span>
+    <span class="tb-ver">v1.0.0</span>
+  </div>
+  <div class="win-controls">
+    <button class="win-btn minimize" onclick="api.minimize()"></button>
+    <button class="win-btn maximize" onclick="api.maximize()"></button>
+    <button class="win-btn close"    onclick="api.close()"></button>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-label">Control</div>
+      <div class="brand-name">E500<br/>3D Print</div>
+      <div class="brand-sub">Registro interno de impresiones</div>
+    </div>
+    <button class="nav-btn active" onclick="showPage('dashboard')"   id="nav-dashboard">  <span class="nav-icon">◈</span> Dashboard</button>
+    <button class="nav-btn"        onclick="showPage('impresiones')" id="nav-impresiones"><span class="nav-icon">◻</span> Impresiones</button>
+    <button class="nav-btn"        onclick="showPage('filamentos')"  id="nav-filamentos"> <span class="nav-icon">◆</span> Filamentos</button>
+    <button class="nav-btn"        onclick="showPage('config')"      id="nav-config">     <span class="nav-icon">⊙</span> Configuración</button>
+    <div class="sidebar-footer">
+      <div class="version-badge">v1.0.0</div>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <!-- ══════════════════════════════════════
+         DASHBOARD
+    ══════════════════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">Resumen general de impresiones y filamentos</div>
+        </div>
+        <button class="btn btn-secondary" onclick="showPage('impresiones');openModalImp()">+ Nueva impresión</button>
+      </div>
+      <div class="page-body">
+        <div class="stats-row stats-row-4">
+          <div class="stat-card"><div class="stat-num c-accent" id="dTotalImp">0</div><div class="stat-lbl">Impresiones</div></div>
+          <div class="stat-card"><div class="stat-num c-ok"    id="dTotalGr">0</div><div class="stat-lbl">Gramos usados</div></div>
+          <div class="stat-card"><div class="stat-num c-warn"  id="dTotalCosto">$0</div><div class="stat-lbl">Costo material</div></div>
+          <div class="stat-card"><div class="stat-num c-purple" id="dFilamentos">0</div><div class="stat-lbl">Filamentos</div></div>
+        </div>
+
+        <!-- Stock de filamentos -->
+        <div class="card">
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+            Stock de filamentos
+            <button class="btn btn-secondary btn-sm" onclick="syncMonsan()">⟳ Sync MONSAN</button>
+          </div>
+          <div id="dashboardFilamentos"></div>
+        </div>
+
+        <!-- Últimas impresiones -->
+        <div class="card">
+          <div class="card-title">Últimas 10 impresiones</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Descripción</th><th>Filamento</th><th>Gramos</th><th>Categoría</th><th>Costo</th></tr></thead>
+              <tbody id="dashboardImpresiones"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         IMPRESIONES
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-impresiones">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Impresiones</div>
+          <div class="page-sub">Registro histórico de todas las impresiones</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModalImp()">+ Nueva impresión</button>
+      </div>
+      <div class="page-body">
+        <!-- Filtros por categoría -->
+        <div class="filtros" id="filtrosCat">
+          <button class="filtro-btn active" onclick="filtrarCat('Todas')">Todas</button>
+          <button class="filtro-btn" onclick="filtrarCat('Personal')">Personal</button>
+          <button class="filtro-btn" onclick="filtrarCat('Encargo externo')">Encargo externo</button>
+          <button class="filtro-btn" onclick="filtrarCat('Mantenimiento / Repuesto')">Mantenimiento</button>
+          <button class="filtro-btn" onclick="filtrarCat('Prototipo / Prueba')">Prototipo</button>
+          <button class="filtro-btn" onclick="filtrarCat('MONSAN Aretes')">MONSAN Aretes</button>
+          <button class="filtro-btn" onclick="filtrarCat('General')">General</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Descripción</th><th>Filamento</th>
+              <th>Gramos</th><th>Tiempo</th><th>Categoría</th>
+              <th>Resultado</th><th>Costo</th><th></th>
+            </tr></thead>
+            <tbody id="bodyImpresiones"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         FILAMENTOS
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-filamentos">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Filamentos</div>
+          <div class="page-sub">Stock y costos de filamentos disponibles</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModalFil()">+ Nuevo filamento</button>
+      </div>
+      <div class="page-body">
+        <!-- Sub-tabs por tipo -->
+        <div class="sub-tabs">
+          <button class="sub-tab active" onclick="showFilTab('Todos')"  id="ftab-Todos">Todos</button>
+          <button class="sub-tab"        onclick="showFilTab('PLA')"    id="ftab-PLA">PLA</button>
+          <button class="sub-tab"        onclick="showFilTab('PLA+')"   id="ftab-PLAp">PLA+</button>
+          <button class="sub-tab"        onclick="showFilTab('PETG')"   id="ftab-PETG">PETG</button>
+          <button class="sub-tab"        onclick="showFilTab('Silk')"   id="ftab-Silk">Silk</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Nombre</th><th>Marca</th><th>Tipo</th>
+              <th>Costo/kg</th><th>Stock</th><th>Nivel</th><th></th>
+            </tr></thead>
+            <tbody id="bodyFilamentos"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         CONFIGURACIÓN
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-config">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Configuración</div>
+          <div class="page-sub">Rutas y parámetros de la app</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveConfig()">Guardar cambios</button>
+      </div>
+      <div class="page-body" style="max-width:700px;">
+        <div class="card">
+          <div class="card-title">Archivos Excel</div>
+          <div class="path-item" onclick="changePath('rutaExcel')">
+            <div class="path-label">📊 Excel E500 (este archivo)</div>
+            <div class="path-val" id="pE500Val"></div>
+          </div>
+          <div class="path-item" onclick="changePath('rutaExcelMonsan')">
+            <div class="path-label">📊 Excel MONSAN (para sincronizar stock)</div>
+            <div class="path-val" id="pMonsanVal"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Costos de operación</div>
+          <div class="form-grid form-grid-2">
+            <div class="field"><label>Costo kWh ($)</label><input type="number" id="cfgKwh" step="0.01"/></div>
+            <div class="field"><label>Watts impresora</label><input type="number" id="cfgWatts"/></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Acciones</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel E500</button>
+            <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcelMonsan)">Abrir Excel MONSAN</button>
+            <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL: IMPRESIÓN
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalImp">
+  <div class="modal" style="width:580px">
+    <div class="modal-title" id="modalImpTitle">Nueva impresión</div>
+    <input type="hidden" id="mImpEditIdx" value=""/>
+    <div class="form-grid form-grid-2">
+      <div class="field"><label>Fecha</label><input type="date" id="mImpFecha"/></div>
+      <div class="field"><label>Categoría</label>
+        <select id="mImpCat">
+          <option value="Personal">Personal</option>
+          <option value="Encargo externo">Encargo externo</option>
+          <option value="Mantenimiento / Repuesto">Mantenimiento / Repuesto</option>
+          <option value="Prototipo / Prueba">Prototipo / Prueba</option>
+          <option value="MONSAN Aretes">MONSAN Aretes</option>
+          <option value="General">General</option>
+        </select>
+      </div>
+      <div class="field" style="grid-column:1/-1"><label>Descripción</label><input type="text" id="mImpDesc" placeholder="Ej: llaveros dorian, soporte joycon..."/></div>
+      <div class="field"><label>Filamento</label>
+        <select id="mImpFil"><option value="">-- selecciona --</option></select>
+      </div>
+      <div class="field"><label>Gramos usados</label><input type="number" id="mImpGr" step="0.01" placeholder="0.00"/></div>
+      <div class="field"><label>Tiempo de impresión</label><input type="text" id="mImpTiempo" placeholder="Ej: 1h 30m"/></div>
+      <div class="field"><label>Resultado</label>
+        <select id="mImpResultado">
+          <option value="">✅ Exitoso</option>
+          <option value="fail">❌ Fallido</option>
+          <option value="parcial">⚠️ Parcial</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalImp')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="saveImpresion()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MODAL: FILAMENTO
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalFil">
+  <div class="modal">
+    <div class="modal-title" id="modalFilTitle">Nuevo filamento</div>
+    <input type="hidden" id="mFilEditIdx" value=""/>
+    <div class="form-grid form-grid-2">
+      <div class="field" style="grid-column:1/-1"><label>Nombre</label><input type="text" id="mFilNombre" placeholder="PLA ROJO KARDENAL"/></div>
+      <div class="field"><label>Marca</label><input type="text" id="mFilMarca" placeholder="Kardenal"/></div>
+      <div class="field"><label>Tipo</label>
+        <select id="mFilTipo">
+          <option value="PLA">PLA</option>
+          <option value="PLA+">PLA+</option>
+          <option value="PETG">PETG</option>
+          <option value="Silk">Silk</option>
+          <option value="TPU">TPU</option>
+          <option value="ASA">ASA</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="field"><label>Costo por kg ($)</label><input type="number" id="mFilCosto" step="0.01" value="0"/></div>
+      <div class="field"><label>Total en gramos</label><input type="number" id="mFilTotal" value="1000"/></div>
+      <div class="field"><label>Stock actual (gr)</label><input type="number" id="mFilStock" value="1000"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalFil')">Cancelar</button>
+      <button class="btn btn-primary"   onclick="saveFilamento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  ESTADO
+// ════════════════════════════════════════════════════════════
+let cfg          = {}
+let filamentos   = []
+let impresiones  = []
+let filTabActual = 'Todos'
+let catFiltro    = 'Todas'
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+async function init () {
+  cfg = await api.getConfig()
+  renderConfig()
+  await loadFilamentos()
+  await loadImpresiones()
+  renderDashboard()
+  populateFilSelect()
+}
+init()
+
+// ════════════════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ════════════════════════════════════════════════════════════
+function showPage (id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById('page-' + id).classList.add('active')
+  document.getElementById('nav-' + id).classList.add('active')
+}
+function openModal  (id) { document.getElementById(id).classList.add('open') }
+function closeModal (id) { document.getElementById(id).classList.remove('open') }
+
+// ════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════════
+function renderConfig () {
+  const sv = (id, val) => {
+    const el = document.getElementById(id)
+    el.textContent = val || 'No configurado'
+    el.className = 'path-val' + (val ? ' set' : '')
+  }
+  sv('pE500Val',    cfg.rutaExcel)
+  sv('pMonsanVal',  cfg.rutaExcelMonsan)
+  document.getElementById('cfgKwh').value   = cfg.costoKwh    || ''
+  document.getElementById('cfgWatts').value = cfg.wattsPrinter|| ''
+}
+
+async function saveConfig () {
+  cfg.costoKwh     = parseFloat(document.getElementById('cfgKwh').value)   || 0
+  cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value) || 0
+  await api.saveConfig(cfg)
+  renderConfig()
+  alert('Configuración guardada.')
+}
+
+async function changePath (key) {
+  const p = await api.selectExcel(cfg[key])
+  if (p) { cfg[key] = p; await api.saveConfig(cfg); renderConfig() }
+}
+
+// ════════════════════════════════════════════════════════════
+//  FILAMENTOS
+// ════════════════════════════════════════════════════════════
+async function loadFilamentos () {
+  filamentos = await api.getFilamentos(cfg.rutaExcel)
+  renderFilamentos()
+  renderDashboardFilamentos()
+}
+
+function showFilTab (tipo) {
+  filTabActual = tipo
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'))
+  const id = tipo === 'PLA+' ? 'ftab-PLAp' : `ftab-${tipo}`
+  const el = document.getElementById(id)
+  if (el) el.classList.add('active')
+  renderFilamentos()
+}
+
+function renderFilamentos () {
+  const tb   = document.getElementById('bodyFilamentos')
+  const data = filTabActual === 'Todos' ? filamentos : filamentos.filter(f => f.tipo === filTabActual)
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sin filamentos</td></tr>'; return }
+  tb.innerHTML = data.map(f => {
+    const pct = f.totalGr > 0 ? Math.round((f.stockGr / f.totalGr) * 100) : 0
+    const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
+    const badge = pct > 50 ? 'badge-ok' : pct > 20 ? 'badge-warn' : 'badge-error'
+    return `<tr>
+      <td>${f.nombre}</td>
+      <td style="color:var(--text2)">${f.marca||'—'}</td>
+      <td><span class="badge badge-accent">${f.tipo}</span></td>
+      <td class="td-mono">$${(+f.costoKg||0).toFixed(0)}/kg</td>
+      <td class="td-mono"><span class="badge ${badge}">${f.stockGr}gr</span></td>
+      <td style="width:120px">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="stock-bar" style="flex:1"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span style="font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace;width:34px">${pct}%</span>
+        </div>
+      </td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editFilamento(${f._idx})">Editar</button>
+        <button class="btn btn-danger btn-sm"    onclick="deleteFilamento('${f.nombre}')">Borrar</button>
+      </div></td>
+    </tr>`
+  }).join('')
+}
+
+function renderDashboardFilamentos () {
+  const el = document.getElementById('dashboardFilamentos')
+  if (!filamentos.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">Sin filamentos registrados</div>'; return }
+  el.innerHTML = filamentos.map(f => {
+    const pct   = f.totalGr > 0 ? Math.round((f.stockGr / f.totalGr) * 100) : 0
+    const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="width:160px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
+      <div class="stock-bar" style="flex:1"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:70px;text-align:right">${f.stockGr}gr / ${f.totalGr}gr</div>
+      <div style="font-size:10px;color:${color};font-family:'JetBrains Mono',monospace;width:34px;text-align:right">${pct}%</div>
+    </div>`
+  }).join('')
+}
+
+function openModalFil () {
+  document.getElementById('modalFilTitle').textContent = 'Nuevo filamento'
+  document.getElementById('mFilEditIdx').value = ''
+  document.getElementById('mFilNombre').value  = ''
+  document.getElementById('mFilMarca').value   = ''
+  document.getElementById('mFilTipo').value    = 'PLA'
+  document.getElementById('mFilCosto').value   = 0
+  document.getElementById('mFilTotal').value   = 1000
+  document.getElementById('mFilStock').value   = 1000
+  openModal('modalFil')
+}
+
+function editFilamento (idx) {
+  const f = filamentos[idx]
+  document.getElementById('modalFilTitle').textContent = 'Editar filamento'
+  document.getElementById('mFilEditIdx').value = idx
+  document.getElementById('mFilNombre').value  = f.nombre
+  document.getElementById('mFilMarca').value   = f.marca  || ''
+  document.getElementById('mFilTipo').value    = f.tipo   || 'PLA'
+  document.getElementById('mFilCosto').value   = f.costoKg
+  document.getElementById('mFilTotal').value   = f.totalGr
+  document.getElementById('mFilStock').value   = f.stockGr
+  openModal('modalFil')
+}
+
+async function saveFilamento () {
+  const nombre = document.getElementById('mFilNombre').value.trim()
+  if (!nombre) { alert('El nombre es obligatorio.'); return }
+  const editIdx = document.getElementById('mFilEditIdx').value
+  await api.saveFilamento(cfg.rutaExcel, {
+    nombre,
+    marca:   document.getElementById('mFilMarca').value.trim(),
+    tipo:    document.getElementById('mFilTipo').value,
+    costoKg: parseFloat(document.getElementById('mFilCosto').value) || 0,
+    totalGr: parseFloat(document.getElementById('mFilTotal').value) || 1000,
+    stockGr: parseFloat(document.getElementById('mFilStock').value) || 0,
+    _editIndex: editIdx !== '' ? parseInt(editIdx) : undefined
+  })
+  closeModal('modalFil')
+  await loadFilamentos()
+  populateFilSelect()
+}
+
+async function deleteFilamento (nombre) {
+  if (!confirm(`¿Eliminar el filamento "${nombre}"?`)) return
+  await api.deleteFilamento(cfg.rutaExcel, nombre)
+  await loadFilamentos()
+  populateFilSelect()
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRESIONES
+// ════════════════════════════════════════════════════════════
+async function loadImpresiones () {
+  impresiones = await api.getImpresiones(cfg.rutaExcel)
+  renderImpresiones()
+  renderDashboard()
+}
+
+function filtrarCat (cat) {
+  catFiltro = cat
+  document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'))
+  event.target.classList.add('active')
+  renderImpresiones()
+}
+
+function renderImpresiones () {
+  const tb   = document.getElementById('bodyImpresiones')
+  const data = catFiltro === 'Todas' ? impresiones : impresiones.filter(i => i.categoria === catFiltro)
+  const sorted = [...data].reverse()
+  if (!sorted.length) { tb.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px">Sin impresiones</td></tr>'; return }
+  tb.innerHTML = sorted.map(i => {
+    const catColor = {
+      'Personal':'badge-accent', 'Encargo externo':'badge-orange',
+      'Mantenimiento / Repuesto':'badge-warn', 'Prototipo / Prueba':'badge-purple',
+      'MONSAN Aretes':'badge-ok', 'General':'badge-blue'
+    }
+    const resColor = i.resultado === 'fail' ? 'badge-error' : i.resultado === 'parcial' ? 'badge-warn' : 'badge-ok'
+    const resLabel = i.resultado === 'fail' ? '❌ Fallido' : i.resultado === 'parcial' ? '⚠️ Parcial' : '✅ OK'
+    return `<tr>
+      <td style="color:var(--text2)">${i.fecha||'—'}</td>
+      <td>${i.descripcion||'—'}</td>
+      <td style="color:var(--text2);font-size:11px">${i.filamento||'—'}</td>
+      <td class="td-mono">${i.gramosUsados||0}gr</td>
+      <td style="color:var(--text2)">${i.tiempo||'—'}</td>
+      <td><span class="badge ${catColor[i.categoria]||'badge-accent'}" style="font-size:8px">${i.categoria||'General'}</span></td>
+      <td><span class="badge ${resColor}">${resLabel}</span></td>
+      <td class="td-mono">$${(+i.costoMaterial||0).toFixed(2)}</td>
+      <td><div class="td-actions">
+        <button class="btn btn-secondary btn-sm" onclick="editImpresion(${i._idx})">Editar</button>
+        <button class="btn btn-danger btn-sm"    onclick="deleteImpresion(${i._idx})">Borrar</button>
+      </div></td>
+    </tr>`
+  }).join('')
+}
+
+function renderDashboard () {
+  document.getElementById('dTotalImp').textContent  = impresiones.length
+  document.getElementById('dTotalGr').textContent   = impresiones.reduce((s,i) => s + (i.gramosUsados||0), 0).toFixed(0) + 'gr'
+  document.getElementById('dTotalCosto').textContent= '$' + impresiones.reduce((s,i) => s + (i.costoMaterial||0), 0).toFixed(2)
+  document.getElementById('dFilamentos').textContent= filamentos.length
+
+  const tb = document.getElementById('dashboardImpresiones')
+  const last10 = [...impresiones].reverse().slice(0,10)
+  if (!last10.length) { tb.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">Sin impresiones</td></tr>'; return }
+  tb.innerHTML = last10.map(i => `<tr>
+    <td style="color:var(--text2)">${i.fecha||'—'}</td>
+    <td>${i.descripcion||'—'}</td>
+    <td style="color:var(--text2);font-size:11px">${i.filamento||'—'}</td>
+    <td class="td-mono">${i.gramosUsados||0}gr</td>
+    <td style="font-size:10px;color:var(--text2)">${i.categoria||'—'}</td>
+    <td class="td-mono">$${(+i.costoMaterial||0).toFixed(2)}</td>
+  </tr>`).join('')
+}
+
+function openModalImp () {
+  document.getElementById('modalImpTitle').textContent = 'Nueva impresión'
+  document.getElementById('mImpEditIdx').value = ''
+  document.getElementById('mImpFecha').value   = new Date().toISOString().split('T')[0]
+  document.getElementById('mImpDesc').value    = ''
+  document.getElementById('mImpFil').value     = ''
+  document.getElementById('mImpGr').value      = ''
+  document.getElementById('mImpTiempo').value  = ''
+  document.getElementById('mImpCat').value     = 'Personal'
+  document.getElementById('mImpResultado').value = ''
+  openModal('modalImp')
+}
+
+function editImpresion (idx) {
+  const i = impresiones[idx]
+  document.getElementById('modalImpTitle').textContent = 'Editar impresión'
+  document.getElementById('mImpEditIdx').value   = idx
+  document.getElementById('mImpFecha').value     = i.fecha   || ''
+  document.getElementById('mImpDesc').value      = i.descripcion || ''
+  document.getElementById('mImpFil').value       = i.filamento   || ''
+  document.getElementById('mImpGr').value        = i.gramosUsados|| ''
+  document.getElementById('mImpTiempo').value    = i.tiempo      || ''
+  document.getElementById('mImpCat').value       = i.categoria   || 'General'
+  document.getElementById('mImpResultado').value = i.resultado   || ''
+  openModal('modalImp')
+}
+
+async function saveImpresion () {
+  const desc = document.getElementById('mImpDesc').value.trim()
+  const fil  = document.getElementById('mImpFil').value
+  const gr   = parseFloat(document.getElementById('mImpGr').value) || 0
+  if (!desc) { alert('La descripción es obligatoria.'); return }
+  if (!fil)  { alert('Selecciona un filamento.'); return }
+  const editIdx = document.getElementById('mImpEditIdx').value
+  await api.saveImpresion(cfg.rutaExcel, {
+    fecha:       document.getElementById('mImpFecha').value,
+    descripcion: desc,
+    filamento:   fil,
+    gramosUsados:gr,
+    tiempo:      document.getElementById('mImpTiempo').value.trim(),
+    categoria:   document.getElementById('mImpCat').value,
+    resultado:   document.getElementById('mImpResultado').value,
+    _editIndex:  editIdx !== '' ? parseInt(editIdx) : undefined
+  })
+  closeModal('modalImp')
+  await loadImpresiones()
+  await loadFilamentos()
+}
+
+async function deleteImpresion (idx) {
+  if (!confirm('¿Eliminar esta impresión?')) return
+  await api.deleteImpresion(cfg.rutaExcel, idx)
+  await loadImpresiones()
+}
+
+// ════════════════════════════════════════════════════════════
+//  SYNC MONSAN
+// ════════════════════════════════════════════════════════════
+async function syncMonsan () {
+  if (!cfg.rutaExcelMonsan) { alert('Configura la ruta del Excel de MONSAN primero.'); return }
+  const res = await api.syncStockMonsan(cfg.rutaExcel, cfg.rutaExcelMonsan)
+  if (res.ok) {
+    await loadFilamentos()
+    alert(`✅ ${res.msg}`)
+  } else {
+    alert('❌ Error: ' + res.msg)
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════════
+function populateFilSelect () {
+  const sel = document.getElementById('mImpFil')
+  const cur = sel.value
+  sel.innerHTML = '<option value="">-- selecciona --</option>'
+  filamentos.forEach(f => sel.innerHTML += `<option value="${f.nombre}"${f.nombre===cur?' selected':''}>${f.nombre} (${f.stockGr}gr)</option>`)
+}
+</script>
+</body>
+</html>

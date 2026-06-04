@@ -1,0 +1,7 @@
+{
+  "rutaExcel": "F:\\DISEÑOS\\E500\\e500_datos.xlsx",
+  "rutaExcelMonsan": "F:\\DISEÑOS\\MONSAM\\aplicacion\\Catalogo_Aretes_3D.xlsx",
+  "costoKwh": 2.80,
+  "wattsPrinter": 350,
+  "version": "1.0.0"
+}
