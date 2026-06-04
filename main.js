@@ -90,89 +90,105 @@ function toSheet (rows) { return XLSX.utils.aoa_to_sheet(rows) }
 
 // ════════════════════════════════════════════════════════════
 //  FILAMENTOS
-//  Hoja "Filamentos":
-//  Nombre | ColorNombre | Marca | Tipo | CostoKg | PesoBobina |
-//  StockGr | CostoTotal | FechaCompra | ColorHex | Notas
+//  Hoja "Filamentos" — estructura REAL del Excel:
+//  [0]Nombre | [1]Marca | [2]Tipo | [3]CostoKg | [4]TotalGr |
+//  [5]StockGr | [6](vacía) | [7](vacía) | [8]ColorHex
 // ════════════════════════════════════════════════════════════
-const FIL_HDR = ['Nombre','ColorNombre','Marca','Tipo','CostoKg','PesoBobina',
-                 'StockGr','CostoTotal','FechaCompra','ColorHex','Notas']
+const FIL_HDR = ['Nombre','Marca','Tipo','CostoKg','TotalGr','StockGr','','','ColorHex']
+
+// Índices de columna — fuente única de verdad
+const FC = {
+  NOMBRE:    0,
+  MARCA:     1,
+  TIPO:      2,
+  COSTO_KG:  3,
+  TOTAL_GR:  4,   // peso total de la bobina
+  STOCK_GR:  5,   // stock actual
+  COLOR_HEX: 8
+}
 
 ipcMain.handle('get-filamentos', (_, filePath) => {
   const wb = readWB(filePath)
   if (!wb) return []
-  ensureSheet(wb, 'Filamentos', FIL_HDR)
   const rows = toRows(wb.Sheets['Filamentos'])
-  return rows.slice(1).filter(r => r[0]).map((r, i) => ({
+  // Detectar fila de cabecera (puede ser fila 0 o 1)
+  const dataStart = rows[0] && String(rows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
+  return rows.slice(dataStart).filter(r => r[FC.NOMBRE]).map((r, i) => ({
     _idx:        i,
-    nombre:      r[0],
-    colorNombre: r[1] || '',
-    marca:       r[2] || '',
-    tipo:        r[3] || 'PLA',
-    costoKg:     Number(r[4]) || 0,
-    pesoBobina:  Number(r[5]) || 1000,
-    stockGr:     Number(r[6]) || 0,
-    costoTotal:  Number(r[7]) || 0,
-    fechaCompra: r[8] || '',
-    colorHex:    r[9] || '#888888',
-    notas:       r[10] || '',
-    stockBajo:   (Number(r[6]) || 0) < STOCK_MINIMO
+    nombre:      r[FC.NOMBRE],
+    colorNombre: r[FC.NOMBRE] || '',   // en tu Excel el nombre ya incluye el color
+    marca:       r[FC.MARCA]     || '',
+    tipo:        r[FC.TIPO]      || 'PLA',
+    costoKg:     Number(r[FC.COSTO_KG])  || 0,
+    pesoBobina:  Number(r[FC.TOTAL_GR])  || 1000,
+    stockGr:     Number(r[FC.STOCK_GR])  || 0,
+    costoTotal:  0,
+    fechaCompra: '',
+    colorHex:    r[FC.COLOR_HEX] || '#888888',
+    notas:       '',
+    stockBajo:   (Number(r[FC.STOCK_GR]) || 0) < STOCK_MINIMO
   }))
 })
 
 ipcMain.handle('save-filamento', (_, filePath, fil) => {
   let wb = readWB(filePath)
   if (!wb) { wb = XLSX.utils.book_new() }
-  ensureSheet(wb, 'Filamentos', FIL_HDR)
+  if (!wb.Sheets['Filamentos']) {
+    const ws = XLSX.utils.aoa_to_sheet([FIL_HDR])
+    XLSX.utils.book_append_sheet(wb, ws, 'Filamentos')
+  }
   const ws   = wb.Sheets['Filamentos']
   const rows = toRows(ws)
+  const dataStart = rows[0] && String(rows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
 
-  // Construir nombre automático: Tipo + ColorNombre + Marca
-  const nombre = fil.nombre ||
-    [fil.tipo, fil.colorNombre, fil.marca].filter(Boolean).join(' ')
-
-  // Calcular costoKg automáticamente si viene costoTotal y pesoBobina
-  let costoKg = fil.costoKg || 0
-  if (!costoKg && fil.costoTotal && fil.pesoBobina) {
+  const nombre  = fil.nombre || fil.colorNombre || ''
+  let costoKg   = fil.costoKg || 0
+  if (!costoKg && fil.costoTotal && fil.pesoBobina)
     costoKg = +((fil.costoTotal / fil.pesoBobina) * 1000).toFixed(2)
+
+  // Construir fila según estructura real del Excel
+  const buildRow = (existing) => {
+    const r = existing ? [...existing] : new Array(9).fill('')
+    r[FC.NOMBRE]    = nombre
+    r[FC.MARCA]     = fil.marca       || r[FC.MARCA]     || ''
+    r[FC.TIPO]      = fil.tipo        || r[FC.TIPO]      || 'PLA'
+    r[FC.COSTO_KG]  = costoKg         || r[FC.COSTO_KG]  || 0
+    r[FC.TOTAL_GR]  = fil.pesoBobina  || r[FC.TOTAL_GR]  || 1000
+    r[FC.STOCK_GR]  = fil.stockGr !== undefined ? fil.stockGr : (r[FC.STOCK_GR] || fil.pesoBobina || 1000)
+    r[FC.COLOR_HEX] = fil.colorHex   || r[FC.COLOR_HEX] || '#888888'
+    return r
   }
 
-  const row = [
-    nombre,
-    fil.colorNombre || '',
-    fil.marca       || '',
-    fil.tipo        || 'PLA',
-    costoKg,
-    fil.pesoBobina  || 1000,
-    fil.stockGr !== undefined ? fil.stockGr : (fil.pesoBobina || 1000),
-    fil.costoTotal  || 0,
-    fil.fechaCompra || '',
-    fil.colorHex    || '#888888',
-    fil.notas       || ''
-  ]
+  const editIdx = fil._editIndex !== undefined ? fil._editIndex + dataStart : -1
+  const existingIdx = rows.findIndex((r, i) => i >= dataStart && r[FC.NOMBRE] === nombre)
 
-  const editIdx = fil._editIndex !== undefined ? fil._editIndex + 1 : -1
-  const idx = editIdx > 0 ? editIdx : rows.findIndex((r, i) => i > 0 && r[0] === nombre)
-  if (idx > 0) rows[idx] = row
-  else rows.push(row)
+  if (editIdx > 0 && editIdx < rows.length)
+    rows[editIdx] = buildRow(rows[editIdx])
+  else if (existingIdx >= dataStart)
+    rows[existingIdx] = buildRow(rows[existingIdx])
+  else
+    rows.push(buildRow(null))
 
   wb.Sheets['Filamentos'] = toSheet(rows)
   const ok = saveWB(wb, filePath)
 
-  // Sincronizar automáticamente con MONSAN al guardar filamento
+  // Sincronizar con MONSAN
   const cfg = loadConfig()
   if (ok && cfg.rutaExcelMonsan) {
-    sincronizarColorMonsan(cfg.rutaExcelMonsan, nombre, row[6], costoKg,
-                           fil.colorNombre, fil.colorHex)
+    const stockGr = fil.stockGr !== undefined ? fil.stockGr : (fil.pesoBobina || 1000)
+    sincronizarColorMonsan(cfg.rutaExcelMonsan, nombre, stockGr, costoKg,
+                           nombre, fil.colorHex)
   }
-
   return ok
 })
 
 ipcMain.handle('delete-filamento', (_, filePath, nombre) => {
   const wb = readWB(filePath)
   if (!wb) return false
-  ensureSheet(wb, 'Filamentos', FIL_HDR)
-  const rows = toRows(wb.Sheets['Filamentos']).filter((r, i) => i === 0 || r[0] !== nombre)
+  const rows = toRows(wb.Sheets['Filamentos']).filter((r, i) => {
+    if (i === 0 && String(r[0]).toLowerCase().includes('nombre')) return true
+    return r[FC.NOMBRE] !== nombre
+  })
   wb.Sheets['Filamentos'] = toSheet(rows)
   return saveWB(wb, filePath)
 })
@@ -181,7 +197,7 @@ ipcMain.handle('get-stock-minimo', () => STOCK_MINIMO)
 
 // ════════════════════════════════════════════════════════════
 //  SINCRONIZACIÓN AUTOMÁTICA CON MONSAN
-//  Se ejecuta cada vez que se modifica el stock de un filamento
+//  Hoja Colores de MONSAN: [0]Nombre [1]CodigoColor [2]Hex [3]Descripcion [4]StockGr [5]CostoPorKg
 // ════════════════════════════════════════════════════════════
 function sincronizarColorMonsan (rutaMonsan, nombreFilamento, nuevoStock, costoKg, colorNombre, colorHex) {
   if (!rutaMonsan || !fs.existsSync(rutaMonsan)) return
@@ -189,17 +205,30 @@ function sincronizarColorMonsan (rutaMonsan, nombreFilamento, nuevoStock, costoK
     const wbM = readWB(rutaMonsan)
     if (!wbM || !wbM.SheetNames.includes('Colores')) return
 
-    const colRows = toRows(wbM.Sheets['Colores'])
-    const nombreBuscar = nombreFilamento.toLowerCase()
+    const colRows    = toRows(wbM.Sheets['Colores'])
+    const buscar     = String(nombreFilamento || '').toLowerCase().trim()
+    let   encontrado = false
 
     for (let i = 1; i < colRows.length; i++) {
-      const nombreCol = String(colRows[i][0] || '').toLowerCase()
-      if (nombreCol.includes(nombreBuscar) || nombreBuscar.includes(nombreCol)) {
-        colRows[i][4] = nuevoStock
-        if (costoKg)    colRows[i][5] = costoKg
-        if (colorHex)   colRows[i][2] = colorHex
+      const nombreCol = String(colRows[i][0] || '').toLowerCase().trim()
+      if (nombreCol === buscar || nombreCol.includes(buscar) || buscar.includes(nombreCol)) {
+        colRows[i][4] = nuevoStock                        // StockGr
+        if (costoKg)  colRows[i][5] = costoKg            // CostoPorKg
+        if (colorHex) colRows[i][2] = colorHex           // Hex
+        encontrado = true
         break
       }
+    }
+
+    // Si no existe el color en MONSAN, lo agrega automáticamente
+    if (!encontrado) {
+      const nombre  = nombreFilamento
+      const base    = nombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
+      const existentes = colRows.slice(1).map(r => String(r[1] || ''))
+      let n = 1
+      while (existentes.includes(`${base}${n}`)) n++
+      const codigo = `${base}${n}`
+      colRows.push([nombre, codigo, colorHex || '#888888', '', nuevoStock, costoKg || 0])
     }
 
     wbM.Sheets['Colores'] = toSheet(colRows)
@@ -246,9 +275,10 @@ ipcMain.handle('save-impresion', async (_, filePath, imp) => {
   let costoKgFil = 0
   if (imp.gramosUsados) {
     const filRows = toRows(wb.Sheets['Filamentos'])
-    const filRow  = filRows.find((r, i) => i > 0 && r[0] === imp.filamento)
+    const dataStart = filRows[0] && String(filRows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
+    const filRow  = filRows.find((r, i) => i >= dataStart && r[FC.NOMBRE] === imp.filamento)
     if (filRow) {
-      costoKgFil = Number(filRow[3]) || 0
+      costoKgFil = Number(filRow[FC.COSTO_KG]) || 0
       if (!costoMat) costoMat = +((imp.gramosUsados / 1000) * costoKgFil).toFixed(2)
     }
   }
@@ -276,15 +306,17 @@ ipcMain.handle('save-impresion', async (_, filePath, imp) => {
   wb.Sheets['Impresiones'] = toSheet(rows)
 
   // Descontar stock del filamento
+  // Estructura real: [5] = StockGr
   let nuevoStock = null
   if (imp.filamento && diferencia !== 0) {
     const filWs   = wb.Sheets['Filamentos']
     const filRows = toRows(filWs)
-    const fi = filRows.findIndex((r, i) => i > 0 && r[0] === imp.filamento)
-    if (fi > 0) {
-      const actual = Number(filRows[fi][5]) || 0
+    const dataStart = filRows[0] && String(filRows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
+    const fi = filRows.findIndex((r, i) => i >= dataStart && r[FC.NOMBRE] === imp.filamento)
+    if (fi >= dataStart) {
+      const actual = Number(filRows[fi][FC.STOCK_GR]) || 0
       nuevoStock = +Math.max(0, actual - diferencia).toFixed(2)
-      filRows[fi][5] = nuevoStock
+      filRows[fi][FC.STOCK_GR] = nuevoStock
       wb.Sheets['Filamentos'] = toSheet(filRows)
     }
   }
@@ -329,33 +361,34 @@ ipcMain.handle('importar-filamentos-a-monsan', (_, rutaE500, rutaMonsan) => {
   if (!wbE) return { ok: false, msg: 'Excel E500 no encontrado' }
   if (!wbM) return { ok: false, msg: 'Excel MONSAN no encontrado' }
 
-  ensureSheet(wbE, 'Filamentos', FIL_HDR)
-  const filRows = toRows(wbE.Sheets['Filamentos'])
+  const filRows   = toRows(wbE.Sheets['Filamentos'])
+  const dataStart = filRows[0] && String(filRows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
 
-  // Generar código desde el nombre del COLOR (no del nombre completo)
-  const genCodigo = (colorNombre, existentes) => {
-    const base = colorNombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
+  const genCodigo = (nombre, existentes) => {
+    const base = nombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
     let n = 1
     while (existentes.has(`${base}${n}`)) n++
     return `${base}${n}`
   }
 
-  // Construir nueva hoja Colores para MONSAN
-  const COL_HDR = ['Nombre', 'CodigoColor', 'Hex', 'Descripcion', 'StockGr', 'CostoPorKg']
-  const nuevasFilas = [COL_HDR]
-  const existentes = new Set()
+  const COL_HDR_M  = ['Nombre', 'CodigoColor', 'Hex', 'Descripcion', 'StockGr', 'CostoPorKg']
+  const nuevasFilas = [COL_HDR_M]
+  const existentes  = new Set()
 
-  for (let i = 1; i < filRows.length; i++) {
-    const f = filRows[i]
-    if (!f[0]) continue
-    const nombre      = String(f[0])
-    const colorNombre = String(f[1] || f[0])  // usar ColorNombre si existe
-    const codigo      = genCodigo(colorNombre, existentes)
+  for (let i = dataStart; i < filRows.length; i++) {
+    const r = filRows[i]
+    if (!r[FC.NOMBRE]) continue
+    const nombre = String(r[FC.NOMBRE])
+    const codigo = genCodigo(nombre, existentes)
     existentes.add(codigo)
-    const hex     = f[9] || '#888888'   // ColorHex en nueva estructura
-    const stockGr = Number(f[6]) || 0   // StockGr en nueva estructura
-    const costoKg = Number(f[4]) || 0   // CostoKg en nueva estructura
-    nuevasFilas.push([nombre, codigo, hex, '', stockGr, costoKg])
+    nuevasFilas.push([
+      nombre,
+      codigo,
+      r[FC.COLOR_HEX] || '#888888',
+      '',
+      Number(r[FC.STOCK_GR])  || 0,
+      Number(r[FC.COSTO_KG])  || 0
+    ])
   }
 
   // Reemplazar hoja Colores en MONSAN
@@ -364,9 +397,8 @@ ipcMain.handle('importar-filamentos-a-monsan', (_, rutaE500, rutaMonsan) => {
     wbM.SheetNames.splice(idx, 1)
     delete wbM.Sheets['Colores']
   }
-  const newWs = toSheet(nuevasFilas)
   wbM.SheetNames.push('Colores')
-  wbM.Sheets['Colores'] = newWs
+  wbM.Sheets['Colores'] = toSheet(nuevasFilas)
 
   const ok = saveWB(wbM, rutaMonsan)
   return {
@@ -385,40 +417,37 @@ ipcMain.handle('sync-stock-monsan', (_, rutaE500, rutaMonsan) => {
   const wbE = readWB(rutaE500)
   const wbM = readWB(rutaMonsan)
   if (!wbE || !wbM) return { ok: false, msg: 'No se encontraron los archivos Excel' }
-
-  ensureSheet(wbE, 'Filamentos', FIL_HDR)
   if (!wbM.SheetNames.includes('Colores')) return { ok: false, msg: 'MONSAN no tiene hoja Colores' }
 
-  const filRows = toRows(wbE.Sheets['Filamentos'])
-  const colRows = toRows(wbM.Sheets['Colores'])
+  const filRows  = toRows(wbE.Sheets['Filamentos'])
+  const colRows  = toRows(wbM.Sheets['Colores'])
+  const dataStart = filRows[0] && String(filRows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
   let actualizados = 0
 
   for (let mi = 1; mi < colRows.length; mi++) {
     const nombreColor = String(colRows[mi][0] || '').toLowerCase().trim()
     if (!nombreColor) continue
     const fi = filRows.findIndex((r, i) => {
-      if (i === 0) return false
-      const n = String(r[0] || '').toLowerCase()
-      return n.includes(nombreColor) || nombreColor.includes(n)
+      if (i < dataStart) return false
+      const n = String(r[FC.NOMBRE] || '').toLowerCase().trim()
+      return n === nombreColor || n.includes(nombreColor) || nombreColor.includes(n)
     })
-    if (fi > 0) {
+    if (fi >= dataStart) {
       // E500 es la fuente de verdad — MONSAN siempre recibe el stock de E500
-      const stockE500 = Number(filRows[fi][6]) || 0
-      colRows[mi][4]  = stockE500
-      if (filRows[fi][4]) colRows[mi][5] = Number(filRows[fi][4])
+      colRows[mi][4] = Number(filRows[fi][FC.STOCK_GR]) || 0   // StockGr
+      if (filRows[fi][FC.COSTO_KG]) colRows[mi][5] = Number(filRows[fi][FC.COSTO_KG])  // CostoPorKg
+      if (filRows[fi][FC.COLOR_HEX]) colRows[mi][2] = filRows[fi][FC.COLOR_HEX]         // Hex
       actualizados++
     }
   }
 
-  // Solo actualizar MONSAN, nunca modificar E500
   wbM.Sheets['Colores'] = toSheet(colRows)
-  const ok1 = saveWB(wbE, rutaE500)
-  const ok2 = saveWB(wbM, rutaMonsan)
+  const ok = saveWB(wbM, rutaMonsan)
 
   return {
-    ok: ok1 && ok2,
+    ok,
     actualizados,
-    msg: `${actualizados} filamentos sincronizados`
+    msg: ok ? `${actualizados} filamentos sincronizados` : 'Error al guardar Excel de MONSAN'
   }
 })
 
@@ -428,13 +457,13 @@ ipcMain.handle('sync-stock-monsan', (_, rutaE500, rutaMonsan) => {
 ipcMain.handle('get-alertas-stock', (_, filePath) => {
   const wb = readWB(filePath)
   if (!wb) return []
-  ensureSheet(wb, 'Filamentos', FIL_HDR)
   const rows = toRows(wb.Sheets['Filamentos'])
-  return rows.slice(1).filter(r => r[0] && (Number(r[6]) || 0) < STOCK_MINIMO).map(r => ({
-    nombre:      r[0],
-    colorNombre: r[1] || '',
-    stockGr:     Number(r[6]) || 0,
-    colorHex:    r[9] || '#888888'
+  const dataStart = rows[0] && String(rows[0][0]).toLowerCase().includes('nombre') ? 1 : 0
+  return rows.slice(dataStart).filter(r => r[FC.NOMBRE] && (Number(r[FC.STOCK_GR]) || 0) < STOCK_MINIMO).map(r => ({
+    nombre:      r[FC.NOMBRE],
+    colorNombre: r[FC.NOMBRE] || '',
+    stockGr:     Number(r[FC.STOCK_GR]) || 0,
+    colorHex:    r[FC.COLOR_HEX] || '#888888'
   }))
 })
 
