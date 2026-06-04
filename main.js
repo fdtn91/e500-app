@@ -397,18 +397,16 @@ ipcMain.handle('sync-stock-monsan', (_, rutaE500, rutaMonsan) => {
       return n.includes(nombreColor) || nombreColor.includes(n)
     })
     if (fi > 0) {
-      const stockE500   = Number(filRows[fi][5]) || 0
-      const stockMonsan = Number(colRows[mi][4]) || 0
-      const stockReal   = Math.min(stockE500, stockMonsan)
-      filRows[fi][5] = stockReal
-      colRows[mi][4] = stockReal
-      if (filRows[fi][3]) colRows[mi][5] = Number(filRows[fi][3])
+      // E500 es la fuente de verdad — MONSAN siempre recibe el stock de E500
+      const stockE500 = Number(filRows[fi][6]) || 0
+      colRows[mi][4]  = stockE500
+      if (filRows[fi][4]) colRows[mi][5] = Number(filRows[fi][4])
       actualizados++
     }
   }
 
-  wbE.Sheets['Filamentos'] = toSheet(filRows)
-  wbM.Sheets['Colores']    = toSheet(colRows)
+  // Solo actualizar MONSAN, nunca modificar E500
+  wbM.Sheets['Colores'] = toSheet(colRows)
   const ok1 = saveWB(wbE, rutaE500)
   const ok2 = saveWB(wbM, rutaMonsan)
 
