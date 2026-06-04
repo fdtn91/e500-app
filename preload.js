@@ -27,5 +27,6 @@ contextBridge.exposeInMainWorld('api', {
   deleteImpresion:   (p, idx)    => ipcRenderer.invoke('delete-impresion', p, idx),
 
   // ── Sincronizar stock con MONSAN ─────────────────────────
-  syncStockMonsan:   (p1, p2)    => ipcRenderer.invoke('sync-stock-monsan', p1, p2),
+  syncStockMonsan:          (p1, p2) => ipcRenderer.invoke('sync-stock-monsan', p1, p2),
+  importarFilamentosMonsan: (p1, p2) => ipcRenderer.invoke('importar-filamentos-a-monsan', p1, p2),
 })

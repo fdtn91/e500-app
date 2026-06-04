@@ -302,6 +302,64 @@ ipcMain.handle('delete-impresion', (_, filePath, rowIndex) => {
 })
 
 // ════════════════════════════════════════════════════════════
+//  IMPORTAR TODOS LOS FILAMENTOS DE E500 A MONSAN COMO COLORES
+//  Borra los colores existentes y los reemplaza con los filamentos de E500
+// ════════════════════════════════════════════════════════════
+ipcMain.handle('importar-filamentos-a-monsan', (_, rutaE500, rutaMonsan) => {
+  const wbE = readWB(rutaE500)
+  const wbM = readWB(rutaMonsan)
+  if (!wbE) return { ok: false, msg: 'Excel E500 no encontrado' }
+  if (!wbM) return { ok: false, msg: 'Excel MONSAN no encontrado' }
+
+  ensureSheet(wbE, 'Filamentos', FIL_HDR)
+  const filRows = toRows(wbE.Sheets['Filamentos'])
+
+  // Generar código automático
+  const genCodigo = (nombre, existentes) => {
+    const base = nombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
+    let n = 1
+    while (existentes.has(`${base}${n}`)) n++
+    return `${base}${n}`
+  }
+
+  // Construir nueva hoja Colores para MONSAN
+  const COL_HDR = ['Nombre', 'CodigoColor', 'Hex', 'Descripcion', 'StockGr', 'CostoPorKg']
+  const nuevasFilas = [COL_HDR]
+  const existentes = new Set()
+
+  for (let i = 1; i < filRows.length; i++) {
+    const f = filRows[i]
+    if (!f[0]) continue
+    const nombre  = String(f[0])
+    const codigo  = genCodigo(nombre, existentes)
+    existentes.add(codigo)
+    const hex     = f[8] || '#888888'
+    const stockGr = Number(f[5]) || 0
+    const costoKg = Number(f[3]) || 0
+    nuevasFilas.push([nombre, codigo, hex, '', stockGr, costoKg])
+  }
+
+  // Reemplazar hoja Colores en MONSAN
+  if (wbM.SheetNames.includes('Colores')) {
+    const idx = wbM.SheetNames.indexOf('Colores')
+    wbM.SheetNames.splice(idx, 1)
+    delete wbM.Sheets['Colores']
+  }
+  const newWs = toSheet(nuevasFilas)
+  wbM.SheetNames.push('Colores')
+  wbM.Sheets['Colores'] = newWs
+
+  const ok = saveWB(wbM, rutaMonsan)
+  return {
+    ok,
+    importados: nuevasFilas.length - 1,
+    msg: ok
+      ? `${nuevasFilas.length - 1} filamentos importados como colores en MONSAN`
+      : 'Error al guardar el Excel de MONSAN'
+  }
+})
+
+// ════════════════════════════════════════════════════════════
 //  SYNC MANUAL COMPLETO CON MONSAN
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('sync-stock-monsan', (_, rutaE500, rutaMonsan) => {

@@ -371,6 +371,12 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel E500</button>
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcelMonsan)">Abrir Excel MONSAN</button>
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
+            <button class="btn btn-danger"    onclick="importarAMonsan()" style="margin-top:8px;width:100%">
+              ⚠️ Reemplazar colores de MONSAN con filamentos de E500
+            </button>
+          </div>
+          <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.6;">
+            ⚠️ <strong>Reemplazar colores</strong> borra todos los colores actuales de MONSAN y los sustituye con los 18 filamentos de E500. Úsalo una sola vez para hacer la migración inicial.
           </div>
         </div>
       </div>
@@ -854,6 +860,17 @@ async function syncMonsan () {
   if (res.ok) {
     await loadFilamentos()
     alert(`✅ ${res.msg}`)
+  } else {
+    alert('❌ Error: ' + res.msg)
+  }
+}
+
+async function importarAMonsan () {
+  if (!cfg.rutaExcelMonsan) { alert('Configura la ruta del Excel de MONSAN primero.'); return }
+  if (!confirm(`¿Confirmas que quieres BORRAR todos los colores actuales de MONSAN y reemplazarlos con los ${filamentos.length} filamentos de E500?\n\nEsta acción no se puede deshacer.`)) return
+  const res = await api.importarFilamentosMonsan(cfg.rutaExcel, cfg.rutaExcelMonsan)
+  if (res.ok) {
+    alert(`✅ ${res.msg}\n\nAhora abre la app de MONSAN y verifica que los colores aparezcan correctamente.`)
   } else {
     alert('❌ Error: ' + res.msg)
   }
