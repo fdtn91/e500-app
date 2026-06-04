@@ -86,11 +86,11 @@ function toSheet (rows) { return XLSX.utils.aoa_to_sheet(rows) }
 // ════════════════════════════════════════════════════════════
 //  FILAMENTOS
 //  Hoja "Filamentos":
-//  Nombre | Marca | Tipo | CostoKg | PesoBobina | StockGr |
-//  CostoTotal | FechaCompra | Color | Notas
+//  Nombre | ColorNombre | Marca | Tipo | CostoKg | PesoBobina |
+//  StockGr | CostoTotal | FechaCompra | ColorHex | Notas
 // ════════════════════════════════════════════════════════════
-const FIL_HDR = ['Nombre','Marca','Tipo','CostoKg','PesoBobina',
-                 'StockGr','CostoTotal','FechaCompra','Color','Notas']
+const FIL_HDR = ['Nombre','ColorNombre','Marca','Tipo','CostoKg','PesoBobina',
+                 'StockGr','CostoTotal','FechaCompra','ColorHex','Notas']
 
 ipcMain.handle('get-filamentos', (_, filePath) => {
   const wb = readWB(filePath)
@@ -100,16 +100,17 @@ ipcMain.handle('get-filamentos', (_, filePath) => {
   return rows.slice(1).filter(r => r[0]).map((r, i) => ({
     _idx:        i,
     nombre:      r[0],
-    marca:       r[1],
-    tipo:        r[2],
-    costoKg:     Number(r[3]) || 0,
-    pesoBobina:  Number(r[4]) || 1000,
-    stockGr:     Number(r[5]) || 0,
-    costoTotal:  Number(r[6]) || 0,
-    fechaCompra: r[7] || '',
-    color:       r[8] || '#888888',
-    notas:       r[9] || '',
-    stockBajo:   (Number(r[5]) || 0) < STOCK_MINIMO
+    colorNombre: r[1] || '',
+    marca:       r[2] || '',
+    tipo:        r[3] || 'PLA',
+    costoKg:     Number(r[4]) || 0,
+    pesoBobina:  Number(r[5]) || 1000,
+    stockGr:     Number(r[6]) || 0,
+    costoTotal:  Number(r[7]) || 0,
+    fechaCompra: r[8] || '',
+    colorHex:    r[9] || '#888888',
+    notas:       r[10] || '',
+    stockBajo:   (Number(r[6]) || 0) < STOCK_MINIMO
   }))
 })
 
@@ -120,6 +121,10 @@ ipcMain.handle('save-filamento', (_, filePath, fil) => {
   const ws   = wb.Sheets['Filamentos']
   const rows = toRows(ws)
 
+  // Construir nombre automático: Tipo + ColorNombre + Marca
+  const nombre = fil.nombre ||
+    [fil.tipo, fil.colorNombre, fil.marca].filter(Boolean).join(' ')
+
   // Calcular costoKg automáticamente si viene costoTotal y pesoBobina
   let costoKg = fil.costoKg || 0
   if (!costoKg && fil.costoTotal && fil.pesoBobina) {
@@ -127,15 +132,21 @@ ipcMain.handle('save-filamento', (_, filePath, fil) => {
   }
 
   const row = [
-    fil.nombre, fil.marca || '', fil.tipo || 'PLA',
-    costoKg, fil.pesoBobina || 1000,
+    nombre,
+    fil.colorNombre || '',
+    fil.marca       || '',
+    fil.tipo        || 'PLA',
+    costoKg,
+    fil.pesoBobina  || 1000,
     fil.stockGr !== undefined ? fil.stockGr : (fil.pesoBobina || 1000),
-    fil.costoTotal || 0, fil.fechaCompra || '',
-    fil.color || '#888888', fil.notas || ''
+    fil.costoTotal  || 0,
+    fil.fechaCompra || '',
+    fil.colorHex    || '#888888',
+    fil.notas       || ''
   ]
 
   const editIdx = fil._editIndex !== undefined ? fil._editIndex + 1 : -1
-  const idx = editIdx > 0 ? editIdx : rows.findIndex((r, i) => i > 0 && r[0] === fil.nombre)
+  const idx = editIdx > 0 ? editIdx : rows.findIndex((r, i) => i > 0 && r[0] === nombre)
   if (idx > 0) rows[idx] = row
   else rows.push(row)
 
@@ -145,7 +156,8 @@ ipcMain.handle('save-filamento', (_, filePath, fil) => {
   // Sincronizar automáticamente con MONSAN al guardar filamento
   const cfg = loadConfig()
   if (ok && cfg.rutaExcelMonsan) {
-    sincronizarColorMonsan(cfg.rutaExcelMonsan, fil.nombre, row[5], costoKg)
+    sincronizarColorMonsan(cfg.rutaExcelMonsan, nombre, row[6], costoKg,
+                           fil.colorNombre, fil.colorHex)
   }
 
   return ok
@@ -166,7 +178,7 @@ ipcMain.handle('get-stock-minimo', () => STOCK_MINIMO)
 //  SINCRONIZACIÓN AUTOMÁTICA CON MONSAN
 //  Se ejecuta cada vez que se modifica el stock de un filamento
 // ════════════════════════════════════════════════════════════
-function sincronizarColorMonsan (rutaMonsan, nombreFilamento, nuevoStock, costoKg) {
+function sincronizarColorMonsan (rutaMonsan, nombreFilamento, nuevoStock, costoKg, colorNombre, colorHex) {
   if (!rutaMonsan || !fs.existsSync(rutaMonsan)) return
   try {
     const wbM = readWB(rutaMonsan)
@@ -178,8 +190,9 @@ function sincronizarColorMonsan (rutaMonsan, nombreFilamento, nuevoStock, costoK
     for (let i = 1; i < colRows.length; i++) {
       const nombreCol = String(colRows[i][0] || '').toLowerCase()
       if (nombreCol.includes(nombreBuscar) || nombreBuscar.includes(nombreCol)) {
-        colRows[i][4] = nuevoStock   // StockGr
-        if (costoKg) colRows[i][5] = costoKg  // CostoPorKg
+        colRows[i][4] = nuevoStock
+        if (costoKg)    colRows[i][5] = costoKg
+        if (colorHex)   colRows[i][2] = colorHex
         break
       }
     }
@@ -314,9 +327,9 @@ ipcMain.handle('importar-filamentos-a-monsan', (_, rutaE500, rutaMonsan) => {
   ensureSheet(wbE, 'Filamentos', FIL_HDR)
   const filRows = toRows(wbE.Sheets['Filamentos'])
 
-  // Generar código automático
-  const genCodigo = (nombre, existentes) => {
-    const base = nombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
+  // Generar código desde el nombre del COLOR (no del nombre completo)
+  const genCodigo = (colorNombre, existentes) => {
+    const base = colorNombre.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase()
     let n = 1
     while (existentes.has(`${base}${n}`)) n++
     return `${base}${n}`
@@ -330,12 +343,13 @@ ipcMain.handle('importar-filamentos-a-monsan', (_, rutaE500, rutaMonsan) => {
   for (let i = 1; i < filRows.length; i++) {
     const f = filRows[i]
     if (!f[0]) continue
-    const nombre  = String(f[0])
-    const codigo  = genCodigo(nombre, existentes)
+    const nombre      = String(f[0])
+    const colorNombre = String(f[1] || f[0])  // usar ColorNombre si existe
+    const codigo      = genCodigo(colorNombre, existentes)
     existentes.add(codigo)
-    const hex     = f[8] || '#888888'
-    const stockGr = Number(f[5]) || 0
-    const costoKg = Number(f[3]) || 0
+    const hex     = f[9] || '#888888'   // ColorHex en nueva estructura
+    const stockGr = Number(f[6]) || 0   // StockGr en nueva estructura
+    const costoKg = Number(f[4]) || 0   // CostoKg en nueva estructura
     nuevasFilas.push([nombre, codigo, hex, '', stockGr, costoKg])
   }
 
@@ -413,9 +427,10 @@ ipcMain.handle('get-alertas-stock', (_, filePath) => {
   if (!wb) return []
   ensureSheet(wb, 'Filamentos', FIL_HDR)
   const rows = toRows(wb.Sheets['Filamentos'])
-  return rows.slice(1).filter(r => r[0] && (Number(r[5]) || 0) < STOCK_MINIMO).map(r => ({
-    nombre:  r[0],
-    stockGr: Number(r[5]) || 0,
-    color:   r[8] || '#888888'
+  return rows.slice(1).filter(r => r[0] && (Number(r[6]) || 0) < STOCK_MINIMO).map(r => ({
+    nombre:      r[0],
+    colorNombre: r[1] || '',
+    stockGr:     Number(r[6]) || 0,
+    colorHex:    r[9] || '#888888'
   }))
 })

@@ -326,7 +326,7 @@ tr:hover td{ background:var(--s2); }
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Nombre</th><th>Marca</th><th>Tipo</th>
+              <th>Nombre</th><th>Color</th><th>Marca</th><th>Tipo</th>
               <th>Costo/kg</th><th>Stock</th><th>Nivel</th><th></th>
             </tr></thead>
             <tbody id="bodyFilamentos"></tbody>
@@ -371,12 +371,6 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel E500</button>
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcelMonsan)">Abrir Excel MONSAN</button>
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
-            <button class="btn btn-danger"    onclick="importarAMonsan()" style="margin-top:8px;width:100%">
-              ⚠️ Reemplazar colores de MONSAN con filamentos de E500
-            </button>
-          </div>
-          <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.6;">
-            ⚠️ <strong>Reemplazar colores</strong> borra todos los colores actuales de MONSAN y los sustituye con los 18 filamentos de E500. Úsalo una sola vez para hacer la migración inicial.
           </div>
         </div>
       </div>
@@ -432,11 +426,13 @@ tr:hover td{ background:var(--s2); }
   <div class="modal" style="width:580px">
     <div class="modal-title" id="modalFilTitle">Nuevo filamento</div>
     <input type="hidden" id="mFilEditIdx" value=""/>
-    <div class="form-grid form-grid-2">
-      <div class="field" style="grid-column:1/-1"><label>Nombre</label><input type="text" id="mFilNombre" placeholder="PLA ROJO KARDENAL"/></div>
-      <div class="field"><label>Marca</label><input type="text" id="mFilMarca" placeholder="Kardenal"/></div>
+    <div style="background:var(--s2);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--accent);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">Nombre generado automáticamente</div>
+      <div id="mFilNombrePreview" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);">—</div>
+    </div>
+    <div class="form-grid form-grid-3">
       <div class="field"><label>Tipo</label>
-        <select id="mFilTipo">
+        <select id="mFilTipo" oninput="actualizarNombre()">
           <option value="PLA">PLA</option>
           <option value="PLA+">PLA+</option>
           <option value="PETG">PETG</option>
@@ -447,7 +443,18 @@ tr:hover td{ background:var(--s2); }
         </select>
       </div>
       <div class="field"><label>Color</label>
-        <input type="color" id="mFilColor" value="#888888" style="height:38px;padding:2px 6px;"/>
+        <input type="text" id="mFilColorNombre" placeholder="Rojo, Verde Matte..." oninput="actualizarNombre()"/>
+      </div>
+      <div class="field"><label>Marca</label>
+        <input type="text" id="mFilMarca" placeholder="Kardenal, Sunlu..." oninput="actualizarNombre()"/>
+      </div>
+    </div>
+    <div class="form-grid form-grid-2" style="margin-top:12px;">
+      <div class="field"><label>Color visual (hex)</label>
+        <input type="color" id="mFilColorHex" value="#888888" style="height:38px;padding:2px 6px;"/>
+      </div>
+      <div class="field"><label>Fecha de compra</label>
+        <input type="date" id="mFilFechaCompra"/>
       </div>
       <div class="field"><label>Peso de la bobina (gr)</label>
         <input type="number" id="mFilPeso" value="1000" oninput="calcCostoKg()"/>
@@ -456,16 +463,13 @@ tr:hover td{ background:var(--s2); }
         <input type="number" id="mFilCostoTotal" step="0.01" value="0" oninput="calcCostoKg()"/>
       </div>
       <div class="field"><label>Costo por kg ($) — calculado</label>
-        <input type="number" id="mFilCostoKg" step="0.01" value="0" placeholder="Se calcula automáticamente"/>
+        <input type="number" id="mFilCostoKg" step="0.01" value="0"/>
       </div>
       <div class="field"><label>Stock actual (gr)</label>
         <input type="number" id="mFilStock" value="1000"/>
       </div>
-      <div class="field"><label>Fecha de compra</label>
-        <input type="date" id="mFilFechaCompra"/>
-      </div>
       <div class="field" style="grid-column:1/-1"><label>Notas</label>
-        <input type="text" id="mFilNotas" placeholder="Ej: comprado en Amazon, lote especial..."/>
+        <input type="text" id="mFilNotas" placeholder="Ej: comprado en Amazon..."/>
       </div>
     </div>
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:var(--text2);">
@@ -530,7 +534,7 @@ function mostrarBannerAlertas (alertas) {
     </div>
     ${alertas.map(a => `
       <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);">
-        <div style="width:10px;height:10px;border-radius:50%;background:${a.color};flex-shrink:0;"></div>
+        <div style="width:10px;height:10px;border-radius:50%;background:${a.colorHex||a.color||'#888'};flex-shrink:0;"></div>
         <span style="font-size:11px;color:var(--text);flex:1">${a.nombre}</span>
         <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--error)">${a.stockGr}gr</span>
       </div>`).join('')}
@@ -607,13 +611,19 @@ function showFilTab (tipo) {
 function renderFilamentos () {
   const tb   = document.getElementById('bodyFilamentos')
   const data = filTabActual === 'Todos' ? filamentos : filamentos.filter(f => f.tipo === filTabActual)
-  if (!data.length) { tb.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sin filamentos</td></tr>'; return }
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:24px">Sin filamentos</td></tr>'; return }
   tb.innerHTML = data.map(f => {
-    const pct = f.totalGr > 0 ? Math.round((f.stockGr / f.totalGr) * 100) : 0
+    const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
     const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
     const badge = pct > 50 ? 'badge-ok' : pct > 20 ? 'badge-warn' : 'badge-error'
     return `<tr>
-      <td>${f.nombre}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:12px;height:12px;border-radius:50%;background:${f.colorHex||'#888'};border:1px solid var(--border);flex-shrink:0;"></div>
+          ${f.nombre}
+        </div>
+      </td>
+      <td style="color:var(--text2)">${f.colorNombre||'—'}</td>
       <td style="color:var(--text2)">${f.marca||'—'}</td>
       <td><span class="badge badge-accent">${f.tipo}</span></td>
       <td class="td-mono">$${(+f.costoKg||0).toFixed(0)}/kg</td>
@@ -636,30 +646,40 @@ function renderDashboardFilamentos () {
   const el = document.getElementById('dashboardFilamentos')
   if (!filamentos.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">Sin filamentos registrados</div>'; return }
   el.innerHTML = filamentos.map(f => {
-    const pct   = f.totalGr > 0 ? Math.round((f.stockGr / f.totalGr) * 100) : 0
+    const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
     const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
     return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="width:10px;height:10px;border-radius:50%;background:${f.colorHex||'#888'};flex-shrink:0;border:1px solid var(--border);"></div>
       <div style="width:160px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
       <div class="stock-bar" style="flex:1"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:70px;text-align:right">${f.stockGr}gr / ${f.totalGr}gr</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:80px;text-align:right">${f.stockGr}gr / ${f.pesoBobina}gr</div>
       <div style="font-size:10px;color:${color};font-family:'JetBrains Mono',monospace;width:34px;text-align:right">${pct}%</div>
     </div>`
   }).join('')
 }
 
+function actualizarNombre () {
+  const tipo  = document.getElementById('mFilTipo').value
+  const color = document.getElementById('mFilColorNombre').value.trim()
+  const marca = document.getElementById('mFilMarca').value.trim()
+  const nombre = [tipo, color, marca].filter(Boolean).join(' ')
+  document.getElementById('mFilNombrePreview').textContent = nombre || '—'
+}
+
 function openModalFil () {
-  document.getElementById('modalFilTitle').textContent = 'Nuevo filamento'
-  document.getElementById('mFilEditIdx').value    = ''
-  document.getElementById('mFilNombre').value     = ''
-  document.getElementById('mFilMarca').value      = ''
-  document.getElementById('mFilTipo').value       = 'PLA'
-  document.getElementById('mFilColor').value      = '#888888'
-  document.getElementById('mFilPeso').value       = 1000
-  document.getElementById('mFilCostoTotal').value = 0
-  document.getElementById('mFilCostoKg').value    = 0
-  document.getElementById('mFilStock').value      = 1000
-  document.getElementById('mFilFechaCompra').value= new Date().toISOString().split('T')[0]
-  document.getElementById('mFilNotas').value      = ''
+  document.getElementById('modalFilTitle').textContent    = 'Nuevo filamento'
+  document.getElementById('mFilEditIdx').value            = ''
+  document.getElementById('mFilTipo').value               = 'PLA'
+  document.getElementById('mFilColorNombre').value        = ''
+  document.getElementById('mFilMarca').value              = ''
+  document.getElementById('mFilColorHex').value           = '#888888'
+  document.getElementById('mFilPeso').value               = 1000
+  document.getElementById('mFilCostoTotal').value         = 0
+  document.getElementById('mFilCostoKg').value            = 0
+  document.getElementById('mFilStock').value              = 1000
+  document.getElementById('mFilFechaCompra').value        = new Date().toISOString().split('T')[0]
+  document.getElementById('mFilNotas').value              = ''
+  document.getElementById('mFilNombrePreview').textContent= '—'
   openModal('modalFil')
 }
 
@@ -673,34 +693,37 @@ function calcCostoKg () {
 
 function editFilamento (idx) {
   const f = filamentos[idx]
-  document.getElementById('modalFilTitle').textContent = 'Editar filamento'
-  document.getElementById('mFilEditIdx').value    = idx
-  document.getElementById('mFilNombre').value     = f.nombre
-  document.getElementById('mFilMarca').value      = f.marca       || ''
-  document.getElementById('mFilTipo').value       = f.tipo        || 'PLA'
-  document.getElementById('mFilColor').value      = f.color       || '#888888'
-  document.getElementById('mFilPeso').value       = f.pesoBobina  || 1000
-  document.getElementById('mFilCostoTotal').value = f.costoTotal  || 0
-  document.getElementById('mFilCostoKg').value    = f.costoKg     || 0
-  document.getElementById('mFilStock').value      = f.stockGr     || 0
-  document.getElementById('mFilFechaCompra').value= f.fechaCompra || ''
-  document.getElementById('mFilNotas').value      = f.notas       || ''
+  document.getElementById('modalFilTitle').textContent     = 'Editar filamento'
+  document.getElementById('mFilEditIdx').value             = idx
+  document.getElementById('mFilTipo').value                = f.tipo         || 'PLA'
+  document.getElementById('mFilColorNombre').value         = f.colorNombre  || ''
+  document.getElementById('mFilMarca').value               = f.marca        || ''
+  document.getElementById('mFilColorHex').value            = f.colorHex     || '#888888'
+  document.getElementById('mFilPeso').value                = f.pesoBobina   || 1000
+  document.getElementById('mFilCostoTotal').value          = f.costoTotal   || 0
+  document.getElementById('mFilCostoKg').value             = f.costoKg      || 0
+  document.getElementById('mFilStock').value               = f.stockGr      || 0
+  document.getElementById('mFilFechaCompra').value         = f.fechaCompra  || ''
+  document.getElementById('mFilNotas').value               = f.notas        || ''
+  document.getElementById('mFilNombrePreview').textContent = f.nombre       || '—'
   openModal('modalFil')
 }
 
 async function saveFilamento () {
-  const nombre = document.getElementById('mFilNombre').value.trim()
-  if (!nombre) { alert('El nombre es obligatorio.'); return }
+  const colorNombre = document.getElementById('mFilColorNombre').value.trim()
+  const tipo        = document.getElementById('mFilTipo').value
+  const marca       = document.getElementById('mFilMarca').value.trim()
+  if (!colorNombre) { alert('El campo Color es obligatorio.'); return }
   const editIdx    = document.getElementById('mFilEditIdx').value
   const pesoBobina = parseFloat(document.getElementById('mFilPeso').value)       || 1000
   const costoTotal = parseFloat(document.getElementById('mFilCostoTotal').value) || 0
   const costoKg    = parseFloat(document.getElementById('mFilCostoKg').value)    || 0
   const stockInput = parseFloat(document.getElementById('mFilStock').value)
   await api.saveFilamento(cfg.rutaExcel, {
-    nombre,
-    marca:       document.getElementById('mFilMarca').value.trim(),
-    tipo:        document.getElementById('mFilTipo').value,
-    color:       document.getElementById('mFilColor').value,
+    colorNombre,
+    tipo,
+    marca,
+    colorHex:    document.getElementById('mFilColorHex').value,
     pesoBobina,
     costoTotal,
     costoKg,
@@ -754,7 +777,12 @@ function renderImpresiones () {
     return `<tr>
       <td style="color:var(--text2)">${i.fecha||'—'}</td>
       <td>${i.descripcion||'—'}</td>
-      <td style="color:var(--text2);font-size:11px">${i.filamento||'—'}</td>
+      <td style="color:var(--text2);font-size:11px">
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${(() => { const f = filamentos.find(x => x.nombre === i.filamento); return f ? `<div style="width:8px;height:8px;border-radius:50%;background:${f.colorHex||'#888'};flex-shrink:0;"></div>` : '' })()}
+          ${i.filamento||'—'}
+        </div>
+      </td>
       <td class="td-mono">${i.gramosUsados||0}gr</td>
       <td style="color:var(--text2)">${i.tiempo||'—'}</td>
       <td><span class="badge ${catColor[i.categoria]||'badge-accent'}" style="font-size:8px">${i.categoria||'General'}</span></td>
@@ -883,7 +911,13 @@ function populateFilSelect () {
   const sel = document.getElementById('mImpFil')
   const cur = sel.value
   sel.innerHTML = '<option value="">-- selecciona --</option>'
-  filamentos.forEach(f => sel.innerHTML += `<option value="${f.nombre}"${f.nombre===cur?' selected':''}>${f.nombre} (${f.stockGr}gr)</option>`)
+  filamentos.forEach(f => {
+    const opt = document.createElement('option')
+    opt.value = f.nombre
+    opt.textContent = `${f.nombre} (${f.stockGr}gr)`
+    if (f.nombre === cur) opt.selected = true
+    sel.appendChild(opt)
+  })
 }
 </script>
 </body>
