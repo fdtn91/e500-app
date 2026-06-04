@@ -34,7 +34,8 @@ function createWindow () {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false   // permite cargar recursos de red local (cámara, Moonraker)
     }
   })
   win.loadFile('index.html')
@@ -435,4 +436,182 @@ ipcMain.handle('get-alertas-stock', (_, filePath) => {
     stockGr:     Number(r[6]) || 0,
     colorHex:    r[9] || '#888888'
   }))
+})
+
+
+// ════════════════════════════════════════════════════════════
+//  MOONRAKER — helpers HTTP
+// ════════════════════════════════════════════════════════════
+const https = require('https')
+const http  = require('http')
+
+function moonrakerGet (baseUrl, endpoint) {
+  return new Promise((resolve, reject) => {
+    const url     = `${baseUrl}${endpoint}`
+    const lib     = url.startsWith('https') ? https : http
+    const timeout = setTimeout(() => reject(new Error('timeout')), 5000)
+    lib.get(url, res => {
+      let data = ''
+      res.on('data', chunk => { data += chunk })
+      res.on('end', () => {
+        clearTimeout(timeout)
+        try { resolve(JSON.parse(data)) }
+        catch (e) { reject(e) }
+      })
+    }).on('error', e => { clearTimeout(timeout); reject(e) })
+  })
+}
+
+function moonrakerPost (baseUrl, endpoint, body) {
+  return new Promise((resolve, reject) => {
+    const postData = body ? JSON.stringify(body) : ''
+    const url      = new URL(`${baseUrl}${endpoint}`)
+    const lib      = url.protocol === 'https:' ? https : http
+    const options  = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === 'https:' ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    }
+    const timeout = setTimeout(() => reject(new Error('timeout')), 5000)
+    const req = lib.request(options, res => {
+      let data = ''
+      res.on('data', chunk => { data += chunk })
+      res.on('end', () => {
+        clearTimeout(timeout)
+        try { resolve(JSON.parse(data)) }
+        catch (e) { reject(e) }
+      })
+    })
+    req.on('error', e => { clearTimeout(timeout); reject(e) })
+    req.write(postData)
+    req.end()
+  })
+}
+
+// ── Estado general de la impresora ──────────────────────────
+// Devuelve: { online, state, temps: { hotend, bed, hotendTarget, bedTarget } }
+ipcMain.handle('moonraker-status', async (_, baseUrl) => {
+  try {
+    const [printerInfo, temps] = await Promise.all([
+      moonrakerGet(baseUrl, '/printer/info'),
+      moonrakerGet(baseUrl, '/printer/objects/query?extruder=temperature,target&heater_bed=temperature,target')
+    ])
+
+    const extruder = temps?.result?.status?.extruder   || {}
+    const bed      = temps?.result?.status?.heater_bed || {}
+    const state    = printerInfo?.result?.state || 'offline'
+
+    // Determinar estado legible
+    let estadoLabel = 'Desconocido'
+    const hotendTemp = extruder.temperature || 0
+    const bedTemp    = bed.temperature      || 0
+    const hotendTgt  = extruder.target      || 0
+    const bedTgt     = bed.target           || 0
+
+    if (state === 'printing')    estadoLabel = 'Imprimiendo'
+    else if (state === 'paused') estadoLabel = 'Pausada'
+    else if (state === 'standby' || state === 'ready') {
+      if (hotendTgt > 0 && bedTgt > 0)   estadoLabel = 'Calentando todo'
+      else if (hotendTgt > 0)             estadoLabel = 'Calentando boquilla'
+      else if (bedTgt > 0)                estadoLabel = 'Calentando cama'
+      else                                estadoLabel = 'Encendida / Idle'
+    } else if (state === 'error')         estadoLabel = 'Error'
+    else if (state === 'shutdown')        estadoLabel = 'Apagada'
+    else                                  estadoLabel = 'Apagada'
+
+    return {
+      online:        true,
+      state,
+      estadoLabel,
+      hotendTemp:    Math.round(hotendTemp),
+      hotendTarget:  Math.round(hotendTgt),
+      bedTemp:       Math.round(bedTemp),
+      bedTarget:     Math.round(bedTgt)
+    }
+  } catch (e) {
+    return { online: false, state: 'offline', estadoLabel: 'Apagada / Sin conexión',
+             hotendTemp: 0, hotendTarget: 0, bedTemp: 0, bedTarget: 0 }
+  }
+})
+
+// ── Trabajo actual ───────────────────────────────────────────
+// Devuelve info del print job en curso (tiempos, capas, archivo)
+ipcMain.handle('moonraker-job', async (_, baseUrl) => {
+  try {
+    const [jobStatus, displayStatus, printStats] = await Promise.all([
+      moonrakerGet(baseUrl, '/printer/objects/query?print_stats=filename,total_duration,print_duration,filament_used,state,message&display_status=progress,message'),
+      moonrakerGet(baseUrl, '/printer/objects/query?display_status=progress,message'),
+      moonrakerGet(baseUrl, '/printer/objects/query?print_stats=filename,total_duration,print_duration,filament_used,state,info')
+    ])
+
+    const ps  = printStats?.result?.status?.print_stats  || {}
+    const ds  = displayStatus?.result?.status?.display_status || {}
+
+    const totalSec    = ps.total_duration  || 0
+    const printedSec  = ps.print_duration  || 0
+    const progress    = ds.progress        || 0
+    const filename    = ps.filename        || ''
+    const state       = ps.state          || 'standby'
+
+    // Estimar tiempo restante
+    let remainSec = 0
+    if (progress > 0 && progress < 1 && printedSec > 0) {
+      remainSec = Math.max(0, (printedSec / progress) - printedSec)
+    }
+
+    // Capas — Moonraker las expone via display_status o toolhead
+    let currentLayer = ps.info?.current_layer  || 0
+    let totalLayers  = ps.info?.total_layer    || 0
+
+    // Nombre del objeto (archivo sin extensión)
+    const objectName = filename.replace(/\.[^.]+$/, '')
+
+    return {
+      online:       true,
+      state,
+      filename,
+      objectName,
+      progress:     Math.round(progress * 100),
+      printedSec:   Math.round(printedSec),
+      totalSec:     Math.round(totalSec),
+      remainSec:    Math.round(remainSec),
+      currentLayer,
+      totalLayers
+    }
+  } catch (e) {
+    return { online: false, state: 'standby', filename: '', objectName: '',
+             progress: 0, printedSec: 0, totalSec: 0, remainSec: 0,
+             currentLayer: 0, totalLayers: 0 }
+  }
+})
+
+// ── Consola (últimas líneas del log de Klipper) ──────────────
+ipcMain.handle('moonraker-console', async (_, baseUrl) => {
+  try {
+    const res = await moonrakerGet(baseUrl, '/server/gcode_store?count=50')
+    const items = res?.result?.gcode_store || []
+    return items.map(e => ({
+      time: e.time,
+      msg:  e.message,
+      type: e.type || 'command'
+    }))
+  } catch (e) {
+    return []
+  }
+})
+
+// ── Enviar G-code ────────────────────────────────────────────
+ipcMain.handle('moonraker-send-gcode', async (_, baseUrl, cmd) => {
+  try {
+    const encoded = encodeURIComponent(cmd)
+    const res = await moonrakerPost(baseUrl, `/printer/gcode/script?script=${encoded}`, null)
+    return { ok: true, result: res }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
 })

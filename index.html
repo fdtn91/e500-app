@@ -189,6 +189,101 @@ tr:hover td{ background:var(--s2); }
 .filtro-btn.active{ background:rgba(0,217,255,.15); border-color:var(--accent); color:var(--accent); }
 
 @keyframes fadeIn{ from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+
+/* ── BARRA INFERIOR IMPRESORA ── */
+#printBar{
+  display:none; flex-shrink:0;
+  background:var(--s1); border-top:1px solid var(--border);
+  height:52px; padding:0 20px;
+  align-items:center; gap:20px;
+  animation:fadeIn .3s ease;
+}
+#printBar.visible{ display:flex; }
+.pb-state{
+  display:flex; align-items:center; gap:8px;
+  font-size:11px; font-weight:700; color:var(--accent);
+  white-space:nowrap;
+}
+.pb-dot{ width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 6px var(--ok); flex-shrink:0; }
+.pb-divider{ width:1px; height:28px; background:var(--border); flex-shrink:0; }
+.pb-item{ display:flex; flex-direction:column; gap:2px; min-width:90px; }
+.pb-lbl{ font-size:8px; font-weight:700; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; }
+.pb-val{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text); }
+.pb-progress{ flex:1; display:flex; align-items:center; gap:8px; }
+.pb-bar{ flex:1; height:4px; background:var(--s3); border-radius:2px; overflow:hidden; min-width:60px; }
+.pb-bar-fill{ height:100%; background:var(--accent); border-radius:2px; transition:width .8s ease; }
+.pb-pct{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); white-space:nowrap; }
+.pb-obj{ font-size:11px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; }
+
+/* ── PÁGINA IMPRESORA ── */
+.printer-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto auto;
+  gap:14px;
+}
+.printer-grid .cam-card{
+  grid-row: 1 / 3;
+}
+.cam-wrap{
+  position:relative; background:#000; border-radius:8px;
+  overflow:hidden; aspect-ratio:16/9;
+}
+.cam-wrap img{
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+.cam-offline{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:var(--muted); font-size:12px;
+}
+.cam-offline .cam-icon{ font-size:32px; }
+
+.temp-row{ display:flex; gap:10px; margin-bottom:12px; }
+.temp-card{
+  flex:1; background:var(--s2); border:1px solid var(--border);
+  border-radius:8px; padding:12px; text-align:center;
+}
+.temp-val{ font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:700; line-height:1; }
+.temp-tgt{ font-size:9px; color:var(--muted); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+.temp-lbl{ font-size:8px; font-weight:700; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin-top:4px; }
+
+.estado-badge{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 14px; border-radius:20px; font-size:11px; font-weight:700;
+  border:1px solid; letter-spacing:.06em;
+}
+.estado-printing { color:var(--ok);     border-color:var(--ok);     background:rgba(63,185,80,.12); }
+.estado-idle      { color:var(--accent); border-color:var(--accent); background:rgba(0,217,255,.10); }
+.estado-heating   { color:var(--warn);   border-color:var(--warn);   background:rgba(210,153,34,.12); }
+.estado-offline   { color:var(--muted);  border-color:var(--muted);  background:transparent; }
+.estado-error     { color:var(--error);  border-color:var(--error);  background:rgba(248,81,73,.12); }
+
+.job-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
+.job-item{ background:var(--s2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+.job-lbl{ font-size:8px; font-weight:700; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin-bottom:4px; }
+.job-val{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text); }
+
+.console-wrap{
+  background:#000; border:1px solid var(--border); border-radius:8px;
+  height:180px; overflow-y:auto; padding:8px 10px;
+  font-family:'JetBrains Mono',monospace; font-size:11px;
+}
+.console-wrap::-webkit-scrollbar{ width:4px; }
+.console-wrap::-webkit-scrollbar-thumb{ background:var(--border); border-radius:2px; }
+.console-line{ padding:1px 0; border-bottom:1px solid rgba(255,255,255,.03); line-height:1.5; }
+.console-line.cmd  { color:var(--accent); }
+.console-line.resp { color:var(--text2); }
+.console-input-row{ display:flex; gap:8px; margin-top:8px; }
+.console-input-row input{
+  flex:1; background:var(--s2); border:1px solid var(--border);
+  border-radius:6px; padding:7px 10px; color:var(--text);
+  font-family:'JetBrains Mono',monospace; font-size:12px; outline:none;
+}
+.console-input-row input:focus{ border-color:var(--accent); }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.pulse{ animation:pulse 1.4s ease infinite; }
 </style>
 </head>
 <body>
@@ -220,7 +315,9 @@ tr:hover td{ background:var(--s2); }
     <button class="nav-btn"        onclick="showPage('impresiones')" id="nav-impresiones"><span class="nav-icon">◻</span> Impresiones</button>
     <button class="nav-btn"        onclick="showPage('filamentos')"  id="nav-filamentos"> <span class="nav-icon">◆</span> Filamentos</button>
     <button class="nav-btn"        onclick="showPage('config')"      id="nav-config">     <span class="nav-icon">⊙</span> Configuración</button>
+    <button class="nav-btn"        onclick="showPage('impresora')"   id="nav-impresora">  <span class="nav-icon">⬡</span> Impresora</button>
     <div class="sidebar-footer">
+      <div id="printerDot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);margin:0 auto 6px;transition:background .4s;"></div>
       <div class="version-badge">v1.0.0</div>
     </div>
   </nav>
@@ -373,10 +470,181 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
           </div>
         </div>
+        <div class="card">
+          <div class="card-title">Impresora (Moonraker)</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>URL Moonraker</label>
+              <input type="text" id="cfgMoonraker" placeholder="http://192.168.68.113"/>
+            </div>
+            <div class="field">
+              <label>URL Cámara</label>
+              <input type="text" id="cfgCamara" placeholder="http://192.168.68.113:8080/?action=stream"/>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         IMPRESORA
+    ══════════════════════════════════════ -->
+    <div class="page" id="page-impresora">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Impresora</div>
+          <div class="page-sub">Estado en tiempo real · Klipper + Moonraker</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div id="printerStatusBadge" class="estado-badge estado-offline">
+            <span class="pb-dot" style="background:var(--muted);box-shadow:none;"></span>
+            <span id="printerStatusLabel">Sin conexión</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="refreshPrinter()">⟳ Actualizar</button>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="printer-grid">
+
+          <!-- CÁMARA (columna izquierda, ocupa 2 filas) -->
+          <div class="card cam-card">
+            <div class="card-title">Cámara</div>
+            <div class="cam-wrap" id="camWrap">
+              <img id="camStream" src="" alt="stream" style="display:none;"
+                   onerror="camError()" onload="camLoaded()"/>
+              <div class="cam-offline" id="camOffline">
+                <div class="cam-icon">📷</div>
+                <div>Cámara no disponible</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMNA DERECHA ARRIBA: Estado + Temperaturas -->
+          <div>
+            <div class="card" style="margin-bottom:14px;">
+              <div class="card-title">Estado</div>
+              <div class="temp-row">
+                <div class="temp-card">
+                  <div class="temp-val" id="tmpHotend" style="color:var(--orange)">—°</div>
+                  <div class="temp-tgt" id="tmpHotendTgt">→ —°</div>
+                  <div class="temp-lbl">Boquilla</div>
+                </div>
+                <div class="temp-card">
+                  <div class="temp-val" id="tmpBed" style="color:var(--warn)">—°</div>
+                  <div class="temp-tgt" id="tmpBedTgt">→ —°</div>
+                  <div class="temp-lbl">Cama</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TRABAJO EN CURSO -->
+            <div class="card" id="jobCard">
+              <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+                Trabajo en curso
+                <span id="jobNone" style="font-size:10px;color:var(--muted);text-transform:none;font-weight:400;letter-spacing:0;">Sin impresión activa</span>
+              </div>
+              <div id="jobInfo" style="display:none;">
+                <div style="margin-bottom:10px;">
+                  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px;">Archivo</div>
+                  <div id="jobFilename" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                </div>
+                <div class="job-grid">
+                  <div class="job-item">
+                    <div class="job-lbl">Transcurrido</div>
+                    <div class="job-val" id="jobElapsed">—</div>
+                  </div>
+                  <div class="job-item">
+                    <div class="job-lbl">Restante</div>
+                    <div class="job-val" id="jobRemain">—</div>
+                  </div>
+                  <div class="job-item">
+                    <div class="job-lbl">Total est.</div>
+                    <div class="job-val" id="jobTotal">—</div>
+                  </div>
+                  <div class="job-item">
+                    <div class="job-lbl">Capa actual</div>
+                    <div class="job-val" id="jobLayer">—</div>
+                  </div>
+                  <div class="job-item">
+                    <div class="job-lbl">Capas totales</div>
+                    <div class="job-val" id="jobTotalLayers">—</div>
+                  </div>
+                  <div class="job-item">
+                    <div class="job-lbl">Progreso</div>
+                    <div class="job-val" id="jobPct" style="color:var(--accent)">—</div>
+                  </div>
+                </div>
+                <div style="margin-top:4px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size:9px;color:var(--muted)">PROGRESO</span>
+                    <span id="jobPctBar" style="font-size:9px;color:var(--accent);font-family:'JetBrains Mono',monospace;">0%</span>
+                  </div>
+                  <div class="stock-bar" style="height:8px;">
+                    <div class="stock-bar-fill" id="jobProgressBar" style="width:0%;background:var(--accent);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONSOLA (fila 2, columna derecha) -->
+          <div class="card">
+            <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+              Consola G-code
+              <button class="btn btn-secondary btn-sm" onclick="clearConsole()">Limpiar</button>
+            </div>
+            <div class="console-wrap" id="consoleWrap"></div>
+            <div class="console-input-row">
+              <input type="text" id="gcodeInput" placeholder="Ej: G28, M104 S200, STATUS..."
+                     onkeydown="if(event.key==='Enter') sendGcode()"/>
+              <button class="btn btn-primary btn-sm" onclick="sendGcode()">Enviar</button>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
 
   </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     BARRA INFERIOR — solo visible al imprimir
+══════════════════════════════════════ -->
+<div id="printBar">
+  <div class="pb-state">
+    <div class="pb-dot pulse"></div>
+    <span>Imprimiendo</span>
+  </div>
+  <div class="pb-divider"></div>
+  <div class="pb-item">
+    <div class="pb-lbl">Archivo</div>
+    <div class="pb-obj" id="pbObj">—</div>
+  </div>
+  <div class="pb-divider"></div>
+  <div class="pb-item">
+    <div class="pb-lbl">Transcurrido</div>
+    <div class="pb-val" id="pbElapsed">—</div>
+  </div>
+  <div class="pb-item">
+    <div class="pb-lbl">Restante</div>
+    <div class="pb-val" id="pbRemain">—</div>
+  </div>
+  <div class="pb-divider"></div>
+  <div class="pb-item">
+    <div class="pb-lbl">Capa</div>
+    <div class="pb-val" id="pbLayer">—</div>
+  </div>
+  <div class="pb-divider"></div>
+  <div class="pb-progress">
+    <div class="pb-bar"><div class="pb-bar-fill" id="pbBarFill" style="width:0%"></div></div>
+    <div class="pb-pct" id="pbPct">0%</div>
+  </div>
+  <button class="btn btn-secondary btn-sm" style="flex-shrink:0;"
+          onclick="showPage('impresora')">
+    Ver →
+  </button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -504,6 +772,9 @@ async function init () {
   populateFilSelect()
   // Verificar alertas de stock al arrancar
   await checkAlertasStock()
+  // Polling ligero de impresora para la barra inferior (siempre activo)
+  pollPrinter()
+  setInterval(pollPrinter, 5000)
 }
 
 async function checkAlertasStock () {
@@ -558,12 +829,21 @@ function showPage (id) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById('page-' + id).classList.add('active')
   document.getElementById('nav-' + id).classList.add('active')
+  if (id === 'impresora') {
+    startCam()
+    startPrinterPolling()
+  } else {
+    stopPrinterPolling()
+  }
 }
 function openModal  (id) { document.getElementById(id).classList.add('open') }
 function closeModal (id) { document.getElementById(id).classList.remove('open') }
 
 // ════════════════════════════════════════════════════════════
 //  CONFIGURACIÓN
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN — extender para Moonraker
 // ════════════════════════════════════════════════════════════
 function renderConfig () {
   const sv = (id, val) => {
@@ -573,13 +853,17 @@ function renderConfig () {
   }
   sv('pE500Val',    cfg.rutaExcel)
   sv('pMonsanVal',  cfg.rutaExcelMonsan)
-  document.getElementById('cfgKwh').value   = cfg.costoKwh    || ''
-  document.getElementById('cfgWatts').value = cfg.wattsPrinter|| ''
+  document.getElementById('cfgKwh').value       = cfg.costoKwh     || ''
+  document.getElementById('cfgWatts').value     = cfg.wattsPrinter || ''
+  document.getElementById('cfgMoonraker').value = cfg.moonrakerUrl || 'http://192.168.68.113'
+  document.getElementById('cfgCamara').value    = cfg.camaraUrl    || 'http://192.168.68.113:8080/?action=stream'
 }
 
 async function saveConfig () {
-  cfg.costoKwh     = parseFloat(document.getElementById('cfgKwh').value)   || 0
-  cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value) || 0
+  cfg.costoKwh     = parseFloat(document.getElementById('cfgKwh').value)       || 0
+  cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value)     || 0
+  cfg.moonrakerUrl = document.getElementById('cfgMoonraker').value.trim()       || cfg.moonrakerUrl
+  cfg.camaraUrl    = document.getElementById('cfgCamara').value.trim()          || cfg.camaraUrl
   await api.saveConfig(cfg)
   renderConfig()
   alert('Configuración guardada.')
@@ -918,6 +1202,183 @@ function populateFilSelect () {
     if (f.nombre === cur) opt.selected = true
     sel.appendChild(opt)
   })
+}
+
+// ════════════════════════════════════════════════════════════
+//  IMPRESORA — polling Moonraker
+// ════════════════════════════════════════════════════════════
+let printerInterval  = null
+let consoleInterval  = null
+let lastConsoleTime  = 0
+
+// ── formatear segundos a h:mm:ss ────────────────────────────
+function fmtSec (sec) {
+  if (!sec || sec <= 0) return '—'
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`
+  if (m > 0) return `${m}m ${String(s).padStart(2,'0')}s`
+  return `${s}s`
+}
+
+// ── aplicar clase de estado al badge ────────────────────────
+function setEstadoBadge (state, label) {
+  const badge = document.getElementById('printerStatusBadge')
+  const lbl   = document.getElementById('printerStatusLabel')
+  badge.className = 'estado-badge'
+  if      (state === 'printing')  badge.classList.add('estado-printing')
+  else if (state === 'paused')    badge.classList.add('estado-printing')
+  else if (state === 'error' || state === 'shutdown') badge.classList.add('estado-error')
+  else if (state === 'offline')   badge.classList.add('estado-offline')
+  else if (label && label.includes('Calentando')) badge.classList.add('estado-heating')
+  else                            badge.classList.add('estado-idle')
+  lbl.textContent = label || state
+  // punto lateral en sidebar
+  const dot = document.getElementById('printerDot')
+  if      (state === 'printing')  { dot.style.background='var(--ok)';    dot.style.boxShadow='0 0 6px var(--ok)'; }
+  else if (state === 'error')     { dot.style.background='var(--error)'; dot.style.boxShadow='0 0 6px var(--error)'; }
+  else if (state === 'offline')   { dot.style.background='var(--muted)'; dot.style.boxShadow='none'; }
+  else                            { dot.style.background='var(--accent)';dot.style.boxShadow='0 0 6px var(--accent)'; }
+}
+
+// ── actualizar temperaturas ──────────────────────────────────
+function updateTemps (status) {
+  document.getElementById('tmpHotend').textContent    = status.hotendTemp  + '°'
+  document.getElementById('tmpHotendTgt').textContent = '→ ' + status.hotendTarget + '°'
+  document.getElementById('tmpBed').textContent       = status.bedTemp     + '°'
+  document.getElementById('tmpBedTgt').textContent    = '→ ' + status.bedTarget    + '°'
+}
+
+// ── actualizar trabajo ───────────────────────────────────────
+function updateJob (job) {
+  const printing = job.state === 'printing' || job.state === 'paused'
+  document.getElementById('jobInfo').style.display = printing ? 'block' : 'none'
+  document.getElementById('jobNone').style.display = printing ? 'none'  : 'inline'
+
+  // barra inferior
+  const bar = document.getElementById('printBar')
+  if (printing) {
+    bar.classList.add('visible')
+  } else {
+    bar.classList.remove('visible')
+  }
+
+  if (!printing) return
+
+  const pct = job.progress || 0
+
+  // Página Impresora
+  document.getElementById('jobFilename').textContent      = job.filename || '—'
+  document.getElementById('jobElapsed').textContent       = fmtSec(job.printedSec)
+  document.getElementById('jobRemain').textContent        = fmtSec(job.remainSec)
+  document.getElementById('jobTotal').textContent         = fmtSec(job.totalSec)
+  document.getElementById('jobLayer').textContent         = job.currentLayer  || '—'
+  document.getElementById('jobTotalLayers').textContent   = job.totalLayers   || '—'
+  document.getElementById('jobPct').textContent           = pct + '%'
+  document.getElementById('jobPctBar').textContent        = pct + '%'
+  document.getElementById('jobProgressBar').style.width   = pct + '%'
+
+  // Barra inferior
+  document.getElementById('pbObj').textContent      = job.objectName || job.filename || '—'
+  document.getElementById('pbElapsed').textContent  = fmtSec(job.printedSec)
+  document.getElementById('pbRemain').textContent   = fmtSec(job.remainSec)
+  const layerStr = job.currentLayer && job.totalLayers
+    ? `${job.currentLayer} / ${job.totalLayers}`
+    : (job.currentLayer || '—')
+  document.getElementById('pbLayer').textContent    = layerStr
+  document.getElementById('pbBarFill').style.width  = pct + '%'
+  document.getElementById('pbPct').textContent      = pct + '%'
+}
+
+// ── cámara ───────────────────────────────────────────────────
+function startCam () {
+  const url = cfg.camaraUrl || 'http://192.168.68.113:8080/?action=stream'
+  const img = document.getElementById('camStream')
+  img.src = url + '&t=' + Date.now()
+  img.style.display = 'block'
+  document.getElementById('camOffline').style.display = 'none'
+}
+function camError () {
+  document.getElementById('camStream').style.display  = 'none'
+  document.getElementById('camOffline').style.display = 'flex'
+}
+function camLoaded () {
+  document.getElementById('camOffline').style.display = 'none'
+}
+
+// ── consola ──────────────────────────────────────────────────
+async function refreshConsole () {
+  const url   = cfg.moonrakerUrl || 'http://192.168.68.113'
+  const lines = await api.moonrakerConsole(url)
+  if (!lines.length) return
+  const wrap  = document.getElementById('consoleWrap')
+  const newLines = lines.filter(l => (l.time || 0) > lastConsoleTime)
+  if (!newLines.length) return
+  lastConsoleTime = Math.max(...lines.map(l => l.time || 0))
+  newLines.forEach(l => {
+    const div = document.createElement('div')
+    div.className = 'console-line ' + (l.type === 'response' ? 'resp' : 'cmd')
+    const ts  = l.time ? new Date(l.time * 1000).toLocaleTimeString('es-MX', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : ''
+    div.textContent = (ts ? `[${ts}] ` : '') + l.msg
+    wrap.appendChild(div)
+  })
+  wrap.scrollTop = wrap.scrollHeight
+}
+
+function clearConsole () {
+  document.getElementById('consoleWrap').innerHTML = ''
+  lastConsoleTime = 0
+}
+
+async function sendGcode () {
+  const input = document.getElementById('gcodeInput')
+  const cmd   = input.value.trim()
+  if (!cmd) return
+  const url = cfg.moonrakerUrl || 'http://192.168.68.113'
+  input.value = ''
+  // mostrar el comando en la consola antes de enviar
+  const wrap = document.getElementById('consoleWrap')
+  const div  = document.createElement('div')
+  div.className   = 'console-line cmd'
+  div.textContent = '> ' + cmd
+  wrap.appendChild(div)
+  wrap.scrollTop  = wrap.scrollHeight
+  await api.moonrakerSendGcode(url, cmd)
+  setTimeout(refreshConsole, 800)
+}
+
+// ── polling principal ────────────────────────────────────────
+async function pollPrinter () {
+  const url = cfg.moonrakerUrl || 'http://192.168.68.113'
+  const [status, job] = await Promise.all([
+    api.moonrakerStatus(url),
+    api.moonrakerJob(url)
+  ])
+  setEstadoBadge(status.state, status.estadoLabel)
+  updateTemps(status)
+  updateJob(job)
+}
+
+async function refreshPrinter () {
+  await pollPrinter()
+  await refreshConsole()
+}
+
+function startPrinterPolling () {
+  pollPrinter()
+  refreshConsole()
+  if (printerInterval) clearInterval(printerInterval)
+  if (consoleInterval)  clearInterval(consoleInterval)
+  printerInterval = setInterval(pollPrinter,    3000)
+  consoleInterval = setInterval(refreshConsole, 5000)
+}
+
+function stopPrinterPolling () {
+  clearInterval(printerInterval)
+  clearInterval(consoleInterval)
+  printerInterval = null
+  consoleInterval = null
 }
 </script>
 </body>

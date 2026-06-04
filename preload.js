@@ -29,4 +29,10 @@ contextBridge.exposeInMainWorld('api', {
   // ── Sincronizar stock con MONSAN ─────────────────────────
   syncStockMonsan:          (p1, p2) => ipcRenderer.invoke('sync-stock-monsan', p1, p2),
   importarFilamentosMonsan: (p1, p2) => ipcRenderer.invoke('importar-filamentos-a-monsan', p1, p2),
+
+  // ── Impresora (Moonraker) ────────────────────────────────
+  moonrakerStatus:   (url)       => ipcRenderer.invoke('moonraker-status', url),
+  moonrakerJob:      (url)       => ipcRenderer.invoke('moonraker-job', url),
+  moonrakerConsole:  (url)       => ipcRenderer.invoke('moonraker-console', url),
+  moonrakerSendGcode:(url, cmd)  => ipcRenderer.invoke('moonraker-send-gcode', url, cmd),
 })

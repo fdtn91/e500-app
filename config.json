@@ -3,5 +3,7 @@
   "rutaExcelMonsan": "F:\\DISEÑOS\\MONSAM\\aplicacion\\Catalogo_Aretes_3D.xlsx",
   "costoKwh": 2.80,
   "wattsPrinter": 350,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "moonrakerUrl": "http://192.168.68.113",
+  "camaraUrl": "http://192.168.68.113:8080/?action=stream"
 }
