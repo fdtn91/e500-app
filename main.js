@@ -108,22 +108,18 @@ ipcMain.handle('save-filamento', (_, __, fil) => {
 
   const stockGr = fil.stockGr !== undefined ? fil.stockGr : (fil.pesoBobina || 1000)
 
-  if (fil._editIndex !== undefined) {
-    // Edición — buscar por nombre original si viene, si no por _editIndex
-    const existing = db.prepare('SELECT id FROM filamentos ORDER BY nombre LIMIT 1 OFFSET ?')
-                       .get(fil._editIndex)
-    if (existing) {
-      db.prepare(`
-        UPDATE filamentos SET
-          nombre=?, marca=?, tipo=?, costo_kg=?, total_gr=?, stock_gr=?,
-          color_hex=?, notas=?, updated_at=datetime('now','localtime')
-        WHERE id=?
-      `).run(nombre, fil.marca||'', fil.tipo||'PLA', costoKg,
-             fil.pesoBobina||1000, stockGr, fil.colorHex||'#888888', fil.notas||'',
-             existing.id)
-      sincronizarFilamentoAInventario(nombre, stockGr, costoKg, fil.colorHex)
-      return true
-    }
+  if (fil._editIndex !== undefined && fil._editIndex !== '') {
+    // Edición — usar _editIndex directamente como id de SQLite
+    db.prepare(`
+      UPDATE filamentos SET
+        nombre=?, marca=?, tipo=?, costo_kg=?, total_gr=?, stock_gr=?,
+        color_hex=?, notas=?, updated_at=datetime('now','localtime')
+      WHERE id=?
+    `).run(nombre, fil.marca||'', fil.tipo||'PLA', costoKg,
+           fil.pesoBobina||1000, stockGr, fil.colorHex||'#888888', fil.notas||'',
+           fil._editIndex)
+    sincronizarFilamentoAInventario(nombre, stockGr, costoKg, fil.colorHex)
+    return true
   }
 
   // Upsert por nombre

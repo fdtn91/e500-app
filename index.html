@@ -985,7 +985,7 @@ function calcCostoKg () {
 }
 
 function editFilamento (idx) {
-  const f = filamentos[idx]
+  const f = filamentos.find(x => x._idx === idx) || filamentos[idx]
   document.getElementById('modalFilTitle').textContent     = 'Editar filamento'
   document.getElementById('mFilEditIdx').value             = idx
   document.getElementById('mFilTipo').value                = f.tipo         || 'PLA'
@@ -1011,8 +1011,9 @@ async function saveFilamento () {
   const pesoBobina = parseFloat(document.getElementById('mFilPeso').value)       || 1000
   const costoTotal = parseFloat(document.getElementById('mFilCostoTotal').value) || 0
   const costoKg    = parseFloat(document.getElementById('mFilCostoKg').value)    || 0
-  const stockInput = parseFloat(document.getElementById('mFilStock').value)
+const stockInput = parseFloat(document.getElementById('mFilStock').value)
   await api.saveFilamento(cfg.rutaExcel, {
+    nombre:      [tipo, colorNombre, marca].filter(Boolean).join(' '),
     colorNombre,
     tipo,
     marca,
@@ -1025,6 +1026,7 @@ async function saveFilamento () {
     notas:       document.getElementById('mFilNotas').value.trim(),
     _editIndex:  editIdx !== '' ? parseInt(editIdx) : undefined
   })
+
   closeModal('modalFil')
   await loadFilamentos()
   populateFilSelect()
