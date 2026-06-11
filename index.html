@@ -728,7 +728,8 @@ tr:hover td{ background:var(--s2); }
     </div>
     <div class="form-grid form-grid-2" style="margin-top:12px;">
       <div class="field"><label>Color visual (hex)</label>
-        <input type="color" id="mFilColorHex" value="#888888" style="height:38px;padding:2px 6px;"/>
+        <input type="color" id="mFilColorHex" value="#888888" style="height:38px;padding:2px 6px;"
+          oninput="actualizarPreviewFilDegradado()"/>
       </div>
       <div class="field"><label>Fecha de compra</label>
         <input type="date" id="mFilFechaCompra"/>
@@ -747,6 +748,34 @@ tr:hover td{ background:var(--s2); }
       </div>
       <div class="field" style="grid-column:1/-1"><label>Notas</label>
         <input type="text" id="mFilNotas" placeholder="Ej: comprado en Amazon..."/>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-top:12px;">
+      <div class="field" style="grid-column:1/-1;">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="mFilDegradado" onchange="toggleFilDegradado()" style="width:14px;height:14px;"/>
+          ¿Es color degradado (bicolor/tricolor)?
+        </label>
+      </div>
+      <div id="mFilDegradadoFields" style="display:none;grid-column:1/-1;">
+        <div class="form-grid form-grid-2">
+          <div class="field"><label>Color 2 (hex)</label>
+            <input type="color" id="mFilColorHex2" value="#FF0000" style="height:38px;padding:2px 6px;"
+              oninput="actualizarPreviewFilDegradado()"/>
+          </div>
+          <div class="field"><label>Color 3 (hex, opcional)</label>
+            <input type="color" id="mFilColorHex3" value="#0000FF" style="height:38px;padding:2px 6px;"
+              oninput="actualizarPreviewFilDegradado()"/>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;text-transform:none;letter-spacing:0;">
+              <input type="checkbox" id="mFilUsarTres" style="width:12px;height:12px;"
+                onchange="actualizarPreviewFilDegradado()"/> Incluir tercer color
+            </label>
+          </div>
+          <div class="field" style="grid-column:1/-1;">
+            <label>Vista previa degradado</label>
+            <div id="mFilDegradadoPreview" style="height:32px;border-radius:6px;border:1px solid var(--border);transition:background .2s;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:var(--text2);">
@@ -886,6 +915,27 @@ async function changePath (key) {
 // ════════════════════════════════════════════════════════════
 //  FILAMENTOS
 // ════════════════════════════════════════════════════════════
+function toggleFilDegradado () {
+  const check = document.getElementById('mFilDegradado').checked
+  document.getElementById('mFilDegradadoFields').style.display = check ? 'grid' : 'none'
+  actualizarPreviewFilDegradado()
+}
+
+function actualizarPreviewFilDegradado () {
+  const hex1 = document.getElementById('mFilColorHex').value
+  const hex2 = document.getElementById('mFilColorHex2').value
+  const usarTres = document.getElementById('mFilUsarTres')?.checked
+  const hex3 = usarTres ? document.getElementById('mFilColorHex3').value : null
+  const preview = document.getElementById('mFilDegradadoPreview')
+  if (!preview) return
+  if (!document.getElementById('mFilDegradado').checked) {
+    preview.style.background = hex1; return
+  }
+  preview.style.background = hex3
+    ? `linear-gradient(135deg,${hex1} 33%,${hex2} 66%,${hex3} 100%)`
+    : `linear-gradient(135deg,${hex1} 50%,${hex2} 50%)`
+}
+
 async function loadFilamentos () {
   filamentos = await api.getFilamentos(cfg.rutaExcel)
   renderFilamentos()
@@ -912,7 +962,7 @@ function renderFilamentos () {
     return `<tr>
       <td>
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:12px;height:12px;border-radius:50%;background:${f.colorHex||'#888'};border:1px solid var(--border);flex-shrink:0;"></div>
+          <div style="width:12px;height:12px;border-radius:50%;background:${f.colorHex2 ? (f.colorHex3 ? `linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)` : `linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`) : (f.colorHex||'#888')};border:1px solid var(--border);flex-shrink:0;"></div>
           ${f.nombre}
         </div>
       </td>
@@ -942,7 +992,7 @@ function renderDashboardFilamentos () {
     const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
     const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
     return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <div style="width:10px;height:10px;border-radius:50%;background:${f.colorHex||'#888'};flex-shrink:0;border:1px solid var(--border);"></div>
+      <div style="width:10px;height:10px;border-radius:50%;background:${f.colorHex2 ? (f.colorHex3 ? `linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)` : `linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`) : (f.colorHex||'#888')};flex-shrink:0;border:1px solid var(--border);"></div>
       <div style="width:160px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.nombre}</div>
       <div class="stock-bar" style="flex:1"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:80px;text-align:right">${f.stockGr}gr / ${f.pesoBobina}gr</div>
@@ -973,6 +1023,12 @@ function openModalFil () {
   document.getElementById('mFilFechaCompra').value        = new Date().toISOString().split('T')[0]
   document.getElementById('mFilNotas').value              = ''
   document.getElementById('mFilNombrePreview').textContent= '—'
+  document.getElementById('mFilDegradado').checked = false
+  document.getElementById('mFilDegradadoFields').style.display = 'none'
+  document.getElementById('mFilColorHex2').value = '#FF0000'
+  document.getElementById('mFilColorHex3').value = '#0000FF'
+  document.getElementById('mFilUsarTres').checked = false
+  document.getElementById('mFilDegradadoPreview').style.background = '#888888'
   openModal('modalFil')
 }
 
@@ -999,6 +1055,13 @@ function editFilamento (idx) {
   document.getElementById('mFilFechaCompra').value         = f.fechaCompra  || ''
   document.getElementById('mFilNotas').value               = f.notas        || ''
   document.getElementById('mFilNombrePreview').textContent = f.nombre       || '—'
+  const isDeg = !!(f.colorHex2)
+  document.getElementById('mFilDegradado').checked = isDeg
+  document.getElementById('mFilDegradadoFields').style.display = isDeg ? 'grid' : 'none'
+  document.getElementById('mFilColorHex2').value = f.colorHex2 || '#FF0000'
+  document.getElementById('mFilColorHex3').value = f.colorHex3 || '#0000FF'
+  document.getElementById('mFilUsarTres').checked = !!f.colorHex3
+  actualizarPreviewFilDegradado()
   openModal('modalFil')
 }
 
@@ -1018,6 +1081,8 @@ const stockInput = parseFloat(document.getElementById('mFilStock').value)
     tipo,
     marca,
     colorHex:    document.getElementById('mFilColorHex').value,
+    colorHex2:   document.getElementById('mFilDegradado').checked ? document.getElementById('mFilColorHex2').value : null,
+    colorHex3:   document.getElementById('mFilDegradado').checked && document.getElementById('mFilUsarTres').checked ? document.getElementById('mFilColorHex3').value : null,
     pesoBobina,
     costoTotal,
     costoKg,

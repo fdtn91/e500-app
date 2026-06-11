@@ -89,13 +89,17 @@ ipcMain.handle('open-excel', async (_, p) => {
 //  FILAMENTOS
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('get-filamentos', () => {
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT id as _idx, nombre, nombre as colorNombre, marca, tipo,
            costo_kg as costoKg, total_gr as pesoBobina, stock_gr as stockGr,
            0 as costoTotal, '' as fechaCompra, color_hex as colorHex, notas,
            CASE WHEN stock_gr < ${STOCK_MINIMO} THEN 1 ELSE 0 END as stockBajo
     FROM filamentos ORDER BY nombre
   `).all()
+  return rows.map(r => {
+    const parts = (r.colorHex || '#888888').split('|')
+    return { ...r, colorHex: parts[0], colorHex2: parts[1]||null, colorHex3: parts[2]||null }
+  })
 })
 
 ipcMain.handle('save-filamento', (_, __, fil) => {
@@ -110,19 +114,21 @@ ipcMain.handle('save-filamento', (_, __, fil) => {
 
   if (fil._editIndex !== undefined && fil._editIndex !== '') {
     // Edición — usar _editIndex directamente como id de SQLite
+    const hexFull = [fil.colorHex, fil.colorHex2, fil.colorHex3].filter(Boolean).join('|') || '#888888'
     db.prepare(`
       UPDATE filamentos SET
         nombre=?, marca=?, tipo=?, costo_kg=?, total_gr=?, stock_gr=?,
         color_hex=?, notas=?, updated_at=datetime('now','localtime')
       WHERE id=?
     `).run(nombre, fil.marca||'', fil.tipo||'PLA', costoKg,
-           fil.pesoBobina||1000, stockGr, fil.colorHex||'#888888', fil.notas||'',
+           fil.pesoBobina||1000, stockGr, hexFull, fil.notas||'',
            fil._editIndex)
     sincronizarFilamentoAInventario(nombre, stockGr, costoKg, fil.colorHex)
     return true
   }
 
   // Upsert por nombre
+  const hexFull = [fil.colorHex, fil.colorHex2, fil.colorHex3].filter(Boolean).join('|') || '#888888'
   db.prepare(`
     INSERT INTO filamentos (nombre, marca, tipo, costo_kg, total_gr, stock_gr, color_hex, notas)
     VALUES (?,?,?,?,?,?,?,?)
@@ -132,7 +138,7 @@ ipcMain.handle('save-filamento', (_, __, fil) => {
       color_hex=excluded.color_hex, notas=excluded.notas,
       updated_at=datetime('now','localtime')
   `).run(nombre, fil.marca||'', fil.tipo||'PLA', costoKg,
-         fil.pesoBobina||1000, stockGr, fil.colorHex||'#888888', fil.notas||'')
+         fil.pesoBobina||1000, stockGr, hexFull, fil.notas||'')
 
   sincronizarFilamentoAInventario(nombre, stockGr, costoKg, fil.colorHex)
   return true
