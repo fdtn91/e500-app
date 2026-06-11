@@ -442,7 +442,12 @@ tr:hover td{ background:var(--s2); }
           <button class="sub-tab"        onclick="showFilTab('PETG')"   id="ftab-PETG">PETG</button>
           <button class="sub-tab"        onclick="showFilTab('Silk')"   id="ftab-Silk">Silk</button>
         </div>
-        <div id="filamentosGrid" style="margin-top:8px;"></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button id="btnAgruparMarca" class="btn btn-secondary btn-sm" onclick="toggleAgruparMarca()">
+            🏷 Agrupar por marca
+          </button>
+        </div>
+        <div id="filamentosGrid" style="margin-top:4px;"></div>
       </div>
     </div>
 
@@ -965,6 +970,19 @@ function showFilTab (tipo) {
   renderFilamentos()
 }
 
+let filAgruparMarca = false
+
+function toggleAgruparMarca () {
+  filAgruparMarca = !filAgruparMarca
+  const btn = document.getElementById('btnAgruparMarca')
+  if (btn) {
+    btn.style.background    = filAgruparMarca ? 'var(--accent)' : ''
+    btn.style.color         = filAgruparMarca ? '#fff' : ''
+    btn.style.borderColor   = filAgruparMarca ? 'var(--accent)' : ''
+  }
+  renderFilamentos()
+}
+
 function renderFilamentos () {
   const grid = document.getElementById('filamentosGrid')
   if (!grid) return
@@ -975,50 +993,58 @@ function renderFilamentos () {
     return
   }
 
-  // Agrupar por marca
-  const grupos = {}
-  data.forEach(f => {
-    const marca = f.marca || 'Sin marca'
-    if (!grupos[marca]) grupos[marca] = []
-    grupos[marca].push(f)
-  })
+  const renderCards = (items) => items.map(f => {
+    const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
+    const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
+    const badge = pct > 50 ? 'badge-ok' : pct > 20 ? 'badge-warn' : 'badge-error'
+    const swatchStyle = f.colorHex2
+      ? f.colorHex3
+        ? `background:linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
+        : `background:linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`
+      : `background:${f.colorHex||'#888'}`
+    return `
+    <div class="fil-card">
+      <div class="fil-card-swatch" style="${swatchStyle}"></div>
+      <div class="fil-card-info">
+        <div class="fil-card-nombre" title="${f.nombre}">${f.colorNombre || f.nombre}</div>
+        <div class="fil-card-meta">
+          <span class="badge badge-accent" style="font-size:9px;">${f.tipo}</span>
+          <span>$${(+f.costoKg||0).toFixed(0)}/kg</span>
+        </div>
+        <div class="fil-card-stock-bar">
+          <div class="fil-card-stock-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;">
+          <span class="badge ${badge}" style="font-size:9px;">${f.stockGr}gr</span>
+          <span style="color:${color};font-family:monospace;font-weight:700;">${pct}%</span>
+        </div>
+        <div class="fil-card-actions">
+          <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;" onclick="editFilamento(${f._idx})">Editar</button>
+          <button class="btn btn-danger btn-sm" style="font-size:10px;" onclick="deleteFilamento('${f.nombre}')">✕</button>
+        </div>
+      </div>
+    </div>`
+  }).join('')
 
   let html = '<div class="filamentos-grid">'
-  Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([marca, items]) => {
-    html += `<div class="fil-grupo-header">📦 ${marca} <span style="font-weight:400;color:var(--muted)">(${items.length})</span></div>`
-    items.forEach(f => {
-      const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
-      const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
-      const badge = pct > 50 ? 'badge-ok' : pct > 20 ? 'badge-warn' : 'badge-error'
-      const swatchStyle = f.colorHex2
-        ? f.colorHex3
-          ? `background:linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
-          : `background:linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`
-        : `background:${f.colorHex||'#888'}`
-      html += `
-      <div class="fil-card">
-        <div class="fil-card-swatch" style="${swatchStyle}"></div>
-        <div class="fil-card-info">
-          <div class="fil-card-nombre" title="${f.nombre}">${f.colorNombre || f.nombre}</div>
-          <div class="fil-card-meta">
-            <span class="badge badge-accent" style="font-size:9px;">${f.tipo}</span>
-            <span>$${(+f.costoKg||0).toFixed(0)}/kg</span>
-          </div>
-          <div class="fil-card-stock-bar">
-            <div class="fil-card-stock-fill" style="width:${pct}%;background:${color}"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;">
-            <span class="badge ${badge}" style="font-size:9px;">${f.stockGr}gr</span>
-            <span style="color:${color};font-family:monospace;font-weight:700;">${pct}%</span>
-          </div>
-          <div class="fil-card-actions">
-            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;" onclick="editFilamento(${f._idx})">Editar</button>
-            <button class="btn btn-danger btn-sm" style="font-size:10px;" onclick="deleteFilamento('${f.nombre}')">✕</button>
-          </div>
-        </div>
-      </div>`
+
+  if (filAgruparMarca) {
+    // Agrupado por marca
+    const grupos = {}
+    data.forEach(f => {
+      const marca = f.marca || 'Sin marca'
+      if (!grupos[marca]) grupos[marca] = []
+      grupos[marca].push(f)
     })
-  })
+    Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([marca, items]) => {
+      html += `<div class="fil-grupo-header">📦 ${marca} <span style="font-weight:400;color:var(--muted)">(${items.length})</span></div>`
+      html += renderCards(items)
+    })
+  } else {
+    // Sin agrupación
+    html += renderCards(data)
+  }
+
   html += '</div>'
   grid.innerHTML = html
 }
