@@ -609,44 +609,63 @@ Por favor proporciona un resumen conciso y útil con:
     })
 
     const apiHost = 'generativelanguage.googleapis.com'
-    const apiPath = `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+    const modelosParaIntentar = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-3.7-flash',
+      'gemini-3.8-flash'
+    ]
 
-    const respuestaTexto = await new Promise((resolve, reject) => {
-      const options = {
-        hostname: apiHost,
-        port: 443,
-        path: apiPath,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(reqBody)
-        }
-      }
-      const timeout = setTimeout(() => reject(new Error('Tiempo de espera agotado al consultar Gemini')), 12000)
-      const req = https.request(options, res => {
-        let respData = ''
-        res.on('data', chunk => { respData += chunk })
-        res.on('end', () => {
-          clearTimeout(timeout)
-          try {
-            const parsed = JSON.parse(respData)
-            const candidateText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
-            if (candidateText) {
-              resolve(candidateText)
-            } else if (parsed?.error) {
-              reject(new Error(parsed.error.message || 'Error de API Gemini'))
-            } else {
-              resolve('No se obtuvo respuesta de texto del modelo.')
+    let respuestaTexto = null
+    let ultimoError = null
+
+    for (const mod of modelosParaIntentar) {
+      try {
+        const apiPath = `/v1beta/models/${mod}:generateContent?key=${apiKey}`
+        respuestaTexto = await new Promise((resolve, reject) => {
+          const options = {
+            hostname: apiHost,
+            port: 443,
+            path: apiPath,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(reqBody)
             }
-          } catch (e) {
-            reject(e)
           }
+          const timeout = setTimeout(() => reject(new Error('Tiempo de espera agotado al consultar Gemini')), 12000)
+          const req = https.request(options, res => {
+            let respData = ''
+            res.on('data', chunk => { respData += chunk })
+            res.on('end', () => {
+              clearTimeout(timeout)
+              try {
+                const parsed = JSON.parse(respData)
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                  const candidateText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
+                  if (candidateText) return resolve(candidateText)
+                }
+                const errMsg = parsed?.error?.message || `HTTP ${res.statusCode}`
+                reject(new Error(errMsg))
+              } catch (e) {
+                reject(e)
+              }
+            })
+          })
+          req.on('error', e => { clearTimeout(timeout); reject(e) })
+          req.write(reqBody)
+          req.end()
         })
-      })
-      req.on('error', e => { clearTimeout(timeout); reject(e) })
-      req.write(reqBody)
-      req.end()
-    })
+        if (respuestaTexto) break
+      } catch (err) {
+        ultimoError = err
+      }
+    }
+
+    if (!respuestaTexto && ultimoError) {
+      throw ultimoError
+    }
 
     return {
       ok: true,
