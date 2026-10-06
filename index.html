@@ -322,6 +322,56 @@ tr:hover td{ background:var(--s2); }
   color:var(--accent); padding:8px 4px 4px;
   border-bottom:1px solid var(--border); margin-bottom:4px;
 }
+
+/* ── TARJETAS LOGOS DE TIENDAS (MERCADO LIBRE & AMAZON) ── */
+.store-card {
+  border-radius: 12px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, filter .18s ease;
+  user-select: none;
+  outline: none;
+}
+.store-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.store-card-ml {
+  background: linear-gradient(135deg, #fff259 0%, #ffe600 100%);
+  border: 2px solid #ecd500;
+  color: #2d3277;
+  box-shadow: 0 4px 14px rgba(255, 230, 0, 0.28);
+}
+.store-card-ml:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: #2d3277;
+  box-shadow: 0 8px 22px rgba(255, 230, 0, 0.5);
+  filter: brightness(1.02);
+}
+.store-card-ml:active {
+  transform: translateY(0) scale(0.99);
+}
+.store-card-amazon {
+  background: linear-gradient(135deg, #1f2833 0%, #131921 100%);
+  border: 2px solid #2e3b4e;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.store-card-amazon:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: #ff9900;
+  box-shadow: 0 8px 22px rgba(255, 153, 0, 0.35);
+  filter: brightness(1.05);
+}
+.store-card-amazon:active {
+  transform: translateY(0) scale(0.99);
+}
 </style>
 </head>
 <body>
@@ -602,16 +652,6 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel E500</button>
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcelMonsan)">Abrir Excel MONSAN</button>
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Inteligencia Artificial (Gemini)</div>
-          <div class="field">
-            <label>API Key de Google Gemini (Opcional)</label>
-            <input type="password" id="cfgGeminiKey" placeholder="AIzaSy..." />
-            <div style="font-size:10px;color:var(--text2);margin-top:4px;">
-              Permite a Gemini analizar precios, comparar Mercado Libre vs Amazon y brindarte recomendaciones de filamento en México.
-            </div>
           </div>
         </div>
 
@@ -1007,13 +1047,18 @@ tr:hover td{ background:var(--s2); }
 </div>
 
 <!-- ══════════════════════════════════════
-     MODAL: COMPARADOR DE PRECIOS (GEMINI)
+     MODAL: COMPARADOR DE PRECIOS EN TIENDAS
 ══════════════════════════════════════ -->
 <div class="modal-backdrop" id="modalComparador">
   <div class="modal" style="width:620px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="modal-title" style="margin-bottom:0;display:flex;align-items:center;gap:8px;">
-        🤖 Comparador de Precios con Gemini
+      <div>
+        <div class="modal-title" style="margin-bottom:2px;display:flex;align-items:center;gap:8px;">
+          🛒 Comparador de Precios
+        </div>
+        <div style="font-size:11px;color:var(--muted);">
+          Compara precios y disponibilidad haciendo clic en los logos de Mercado Libre y Amazon México
+        </div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modalComparador')" style="padding:2px 8px;">✕</button>
     </div>
@@ -1031,52 +1076,55 @@ tr:hover td{ background:var(--s2); }
     <div class="form-grid form-grid-3" style="margin-bottom:12px;">
       <div class="field">
         <label>Marca</label>
-        <input type="text" id="mCompMarca" placeholder="Ej: Sunlu, Kardenal..." />
+        <input type="text" id="mCompMarca" placeholder="Ej: Sunlu, Kardenal..." oninput="actualizarBusquedaComparador()" />
       </div>
       <div class="field">
         <label>Material</label>
-        <input type="text" id="mCompTipo" placeholder="Ej: PLA, PETG, TPU..." />
+        <input type="text" id="mCompTipo" placeholder="Ej: PLA, PETG, TPU..." oninput="actualizarBusquedaComparador()" />
       </div>
       <div class="field">
         <label>Color</label>
-        <input type="text" id="mCompColor" placeholder="Ej: Azul Matte, Blanco..." />
+        <input type="text" id="mCompColor" placeholder="Ej: Azul Matte, Blanco..." oninput="actualizarBusquedaComparador()" />
       </div>
     </div>
 
     <div class="field" style="margin-bottom:14px;">
       <label style="font-weight:600;">Datos extra para la búsqueda (opcional)</label>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="mCompExtra" placeholder="Ej: 1kg 1.75mm, alta velocidad, oferta, paquete 2 rollos..." style="flex:1;" onkeydown="if(event.key==='Enter') ejecutarBusquedaComparador()" />
-        <button class="btn btn-primary" onclick="ejecutarBusquedaComparador()" id="btnEjecutarBusquedaComp" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
-          🔍 Buscar ahora
+        <input type="text" id="mCompExtra" placeholder="Ej: 1kg 1.75mm, alta velocidad, oferta, paquete 2 rollos..." style="flex:1;" oninput="actualizarBusquedaComparador()" onkeydown="if(event.key==='Enter') actualizarBusquedaComparador()" />
+        <button class="btn btn-secondary" onclick="actualizarBusquedaComparador()" id="btnEjecutarBusquedaComp" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
+          🔄 Actualizar
         </button>
       </div>
     </div>
 
-    <!-- Estado de carga -->
-    <div id="mCompLoading" style="display:none;text-align:center;padding:24px 12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
-      <div style="font-size:24px;animation:spin 1s linear infinite;display:inline-block;margin-bottom:8px;">⏳</div>
-      <div style="font-size:12px;color:var(--text);font-weight:600;">Comparando precios y analizando opciones con Gemini...</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Consultando mercado en Mercado Libre y Amazon México</div>
+    <!-- Indicador de consulta activa -->
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px;background:var(--s2);padding:9px 12px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+      <div>Búsqueda: <strong id="mCompQueryPreview" style="color:var(--accent);font-family:monospace;">filamento</strong></div>
+      <div style="font-size:10px;color:var(--muted);">Haz clic en el logo para abrir los resultados en tu navegador</div>
     </div>
 
-    <!-- Botones directos a Mercado Libre y Amazon -->
-    <div id="mCompEnlacesBox" style="display:none;margin-bottom:14px;">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">Enlaces directos de compra en México:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button class="btn btn-secondary" onclick="abrirLinkML()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#ffe600;color:#2d3277;font-weight:800;border:none;">
-          💛 Mercado Libre México ↗
-        </button>
-        <button class="btn btn-secondary" onclick="abrirLinkAmazon()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#232f3e;color:#ff9900;font-weight:800;border:none;">
-          📦 Amazon México ↗
-        </button>
+    <!-- Logos interactivos clicables de Mercado Libre y Amazon en PNG transparente -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <!-- Logo Mercado Libre -->
+      <div class="store-card store-card-ml" onclick="abrirLinkML()" role="button" tabindex="0" title="Ver ofertas en Mercado Libre México">
+        <div style="height:44px;display:flex;align-items:center;justify-content:center;">
+          <img src="logo_mercadolibre.png" alt="Mercado Libre" style="height:38px;max-width:190px;object-fit:contain;" />
+        </div>
+        <div style="font-size:11px;color:#2D3277;font-weight:700;display:flex;align-items:center;gap:4px;margin-top:2px;">
+          <span>⚡ Clic para ver ofertas y precios Full ↗</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Resultado / Análisis de Gemini -->
-    <div id="mCompResultadoBox" style="display:none;">
-      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">💡 Análisis comparativo y recomendación:</div>
-      <div id="mCompResumen" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6;color:var(--text);white-space:pre-wrap;max-height:220px;overflow-y:auto;"></div>
+      <!-- Logo Amazon -->
+      <div class="store-card store-card-amazon" onclick="abrirLinkAmazon()" role="button" tabindex="0" title="Ver precios en Amazon México">
+        <div style="height:44px;display:flex;align-items:center;justify-content:center;">
+          <img src="logo_amazon.png" alt="Amazon" style="height:36px;max-width:140px;object-fit:contain;" />
+        </div>
+        <div style="font-size:11px;color:#ff9900;font-weight:700;display:flex;align-items:center;gap:4px;margin-top:2px;">
+          <span>📦 Clic para ver precios y entrega Prime ↗</span>
+        </div>
+      </div>
     </div>
 
     <div class="modal-footer" style="margin-top:16px;">
@@ -1196,8 +1244,6 @@ function renderConfig () {
   document.getElementById('cfgWatts').value     = cfg.wattsPrinter || ''
   document.getElementById('cfgMoonraker').value = cfg.moonrakerUrl || 'http://192.168.68.113'
   document.getElementById('cfgCamara').value    = cfg.camaraUrl    || 'http://192.168.68.113:8080/?action=stream'
-  const elGemini = document.getElementById('cfgGeminiKey')
-  if (elGemini) elGemini.value = cfg.geminiApiKey || ''
 }
 
 async function saveConfig () {
@@ -1205,8 +1251,6 @@ async function saveConfig () {
   cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value)     || 0
   cfg.moonrakerUrl = document.getElementById('cfgMoonraker').value.trim()       || cfg.moonrakerUrl
   cfg.camaraUrl    = document.getElementById('cfgCamara').value.trim()          || cfg.camaraUrl
-  const elGemini   = document.getElementById('cfgGeminiKey')
-  if (elGemini) cfg.geminiApiKey = elGemini.value.trim()
   await api.saveConfig(cfg)
   renderConfig()
   alert('Configuración guardada.')
@@ -1307,8 +1351,8 @@ function renderFilamentos () {
         <div class="fil-card-actions" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
           <div style="display:flex;gap:4px;width:100%;">
             <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})">⚖️ Stock</button>
-            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:3px;" onclick="abrirComparadorFilamento(${f._idx})" title="Buscar precios con Gemini en Mercado Libre y Amazon">
-              🤖 Buscar
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:3px;" onclick="abrirComparadorFilamento(${f._idx})" title="Comparar precios en Mercado Libre y Amazon México">
+              🛒 Precios
             </button>
           </div>
           <div style="display:flex;gap:4px;width:100%;">
@@ -1557,9 +1601,42 @@ async function guardarAjusteStock () {
 }
 
 // ════════════════════════════════════════════════════════════
-//  COMPARADOR DE PRECIOS CON GEMINI (MERCADOLIBRE & AMAZON)
+//  COMPARADOR DE PRECIOS EN TIENDAS (MERCADO LIBRE & AMAZON)
 // ════════════════════════════════════════════════════════════
 let comparadorUrls = { ml: '', amazon: '' }
+
+function limpiarColorFilamento (nombreCompleto, tipo, marca) {
+  let str = (nombreCompleto || '').trim()
+  if (!str) return ''
+  if (tipo) {
+    const escTipo = tipo.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+    str = str.replace(new RegExp('\\b' + escTipo + '\\b', 'gi'), ' ')
+  }
+  if (marca && !/^(desconocida|sin marca)$/i.test(marca)) {
+    const escMarca = marca.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+    str = str.replace(new RegExp('\\b' + escMarca + '\\b', 'gi'), ' ')
+  }
+  str = str.replace(/\bfilamento\b/gi, ' ')
+  str = str.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return str || (nombreCompleto || '').trim()
+}
+
+function generarQueryLimpia (tipo, marca, color, extra) {
+  const raw = ['filamento', tipo, marca, color, extra].filter(Boolean).join(' ')
+  const tokens = raw.replace(/\s+/g, ' ').trim().split(' ')
+  const vistas = new Set()
+  const palabras = []
+  for (const t of tokens) {
+    const cleanToken = t.trim()
+    if (!cleanToken) continue
+    const lower = cleanToken.toLowerCase()
+    if (!vistas.has(lower)) {
+      vistas.add(lower)
+      palabras.push(cleanToken)
+    }
+  }
+  return palabras.join(' ')
+}
 
 function abrirComparadorFilamento (idx) {
   const f = filamentos.find(x => x._idx === idx || x.id === idx) || filamentos[idx]
@@ -1577,66 +1654,42 @@ function abrirComparadorFilamento (idx) {
     swatch.style.background = f.colorHex || '#888'
   }
 
-  document.getElementById('mCompMarca').value = f.marca || ''
-  document.getElementById('mCompTipo').value  = f.tipo || 'PLA'
-  document.getElementById('mCompColor').value = f.colorNombre || ''
-  document.getElementById('mCompExtra').value = '1kg 1.75mm'
+  const marcaLimpia = (f.marca && !/^(desconocida|sin marca)$/i.test(f.marca)) ? f.marca.trim() : ''
+  const tipoLimpio  = (f.tipo || 'PLA').trim()
+  const colorLimpio = limpiarColorFilamento(f.nombre || f.colorNombre || '', tipoLimpio, marcaLimpia)
 
-  document.getElementById('mCompLoading').style.display      = 'none'
-  document.getElementById('mCompEnlacesBox').style.display    = 'none'
-  document.getElementById('mCompResultadoBox').style.display  = 'none'
-  document.getElementById('mCompResumen').textContent        = ''
+  document.getElementById('mCompMarca').value = marcaLimpia
+  document.getElementById('mCompTipo').value  = tipoLimpio
+  document.getElementById('mCompColor').value = colorLimpio
+  document.getElementById('mCompExtra').value = ''
 
+  actualizarBusquedaComparador()
   openModal('modalComparador')
-
-  // Disparar búsqueda automáticamente
-  setTimeout(() => {
-    ejecutarBusquedaComparador()
-  }, 150)
 }
 
-async function ejecutarBusquedaComparador () {
-  const marca = document.getElementById('mCompMarca').value.trim()
-  const tipo  = document.getElementById('mCompTipo').value.trim()
-  const color = document.getElementById('mCompColor').value.trim()
-  const extra = document.getElementById('mCompExtra').value.trim()
+function actualizarBusquedaComparador () {
+  const marca = (document.getElementById('mCompMarca')?.value || '').trim()
+  const tipo  = (document.getElementById('mCompTipo')?.value || '').trim()
+  const color = (document.getElementById('mCompColor')?.value || '').trim()
+  const extra = (document.getElementById('mCompExtra')?.value || '').trim()
 
-  const btn = document.getElementById('btnEjecutarBusquedaComp')
-  if (btn) btn.disabled = true
+  const qLimpia = generarQueryLimpia(tipo, marca, color, extra)
+  const qEncoded = encodeURIComponent(qLimpia)
 
-  document.getElementById('mCompLoading').style.display      = 'block'
-  document.getElementById('mCompEnlacesBox').style.display    = 'none'
-  document.getElementById('mCompResultadoBox').style.display  = 'none'
+  comparadorUrls.ml = `https://listado.mercadolibre.com.mx/${qEncoded}`
+  comparadorUrls.amazon = `https://www.amazon.com.mx/s?k=${qEncoded}`
 
-  try {
-    const res = await api.buscarPreciosGemini({ marca, tipo, color, extra })
-    document.getElementById('mCompLoading').style.display = 'none'
-
-    if (res && res.ok) {
-      comparadorUrls.ml     = res.urlML || ''
-      comparadorUrls.amazon = res.urlAmazon || ''
-
-      document.getElementById('mCompEnlacesBox').style.display   = 'block'
-      document.getElementById('mCompResultadoBox').style.display = 'block'
-      document.getElementById('mCompResumen').textContent       = res.resumen || 'Búsqueda completada.'
-    } else {
-      document.getElementById('mCompResultadoBox').style.display = 'block'
-      document.getElementById('mCompResumen').textContent       = 'Error al realizar la consulta: ' + ((res && res.error) || 'Desconocido')
-    }
-  } catch (err) {
-    document.getElementById('mCompLoading').style.display      = 'none'
-    document.getElementById('mCompResultadoBox').style.display  = 'block'
-    document.getElementById('mCompResumen').textContent        = 'Error de comunicación: ' + err.message
-  } finally {
-    if (btn) btn.disabled = false
-  }
+  const preview = document.getElementById('mCompQueryPreview')
+  if (preview) preview.textContent = qLimpia || 'filamento'
 }
 
 function abrirLinkML () {
+  actualizarBusquedaComparador()
   if (comparadorUrls.ml) api.openExternal(comparadorUrls.ml)
 }
 
 function abrirLinkAmazon () {
+  actualizarBusquedaComparador()
   if (comparadorUrls.amazon) api.openExternal(comparadorUrls.amazon)
 }
 
