@@ -561,15 +561,22 @@ ipcMain.handle('moonraker-send-gcode', async (_, baseUrl, cmd) => {
 // ════════════════════════════════════════════════════════════
 function buildFilamentoSearchUrls (data) {
   const { marca, tipo, color, extra } = data || {}
-  const partesQuery = [
-    'filamento',
-    tipo || '',
-    marca || '',
-    color || '',
-    extra || ''
-  ].filter(Boolean)
+  const raw = ['filamento', tipo, marca, color, extra].filter(Boolean).join(' ')
+  const tokens = raw.replace(/\s+/g, ' ').trim().split(' ')
 
-  const queryLimpia = partesQuery.join(' ').replace(/\s+/g, ' ').trim()
+  const vistas = new Set()
+  const palabras = []
+  for (const t of tokens) {
+    const cleanToken = t.trim()
+    if (!cleanToken) continue
+    const lower = cleanToken.toLowerCase()
+    if (!vistas.has(lower)) {
+      vistas.add(lower)
+      palabras.push(cleanToken)
+    }
+  }
+
+  const queryLimpia = palabras.join(' ')
   const qEncoded = encodeURIComponent(queryLimpia)
   const urlML = `https://listado.mercadolibre.com.mx/${qEncoded}`
   const urlAmazon = `https://www.amazon.com.mx/s?k=${qEncoded}`
