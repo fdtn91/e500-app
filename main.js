@@ -557,9 +557,9 @@ ipcMain.handle('moonraker-send-gcode', async (_, baseUrl, cmd) => {
 })
 
 // ════════════════════════════════════════════════════════════
-//  BÚSQUEDA Y COMPARADOR DE FILAMENTOS (GEMINI + ML / AMAZON)
+//  BÚSQUEDA DE FILAMENTOS (MERCADO LIBRE / AMAZON MÉXICO)
 // ════════════════════════════════════════════════════════════
-ipcMain.handle('buscar-precios-gemini', async (_, data) => {
+function buildFilamentoSearchUrls (data) {
   const { marca, tipo, color, extra } = data || {}
   const partesQuery = [
     'filamento',
@@ -574,116 +574,14 @@ ipcMain.handle('buscar-precios-gemini', async (_, data) => {
   const urlML = `https://listado.mercadolibre.com.mx/${qEncoded}`
   const urlAmazon = `https://www.amazon.com.mx/s?k=${qEncoded}`
 
-  const cfg = loadConfig()
-  const apiKey = (cfg.geminiApiKey || process.env.GEMINI_API_KEY || '').trim()
-
-  if (!apiKey) {
-    return {
-      ok: true,
-      hasGemini: false,
-      query: queryLimpia,
-      urlML,
-      urlAmazon,
-      resumen: `Búsqueda lista para "${queryLimpia}". Puedes comparar los precios directamente en Mercado Libre y Amazon haciendo clic en los botones de abajo. (Opcional: configura tu API Key de Gemini en Configuración para activar análisis asistido).`
-    }
+  return {
+    ok: true,
+    query: queryLimpia,
+    urlML,
+    urlAmazon
   }
+}
 
-  try {
-    const prompt = `Actúa como asistente experto en impresión 3D en México.
-Compara opciones de compra para el siguiente filamento:
-- Tipo de material: ${tipo || 'PLA'}
-- Marca: ${marca || 'Cualquiera'}
-- Color: ${color || 'Cualquiera'}
-- Términos adicionales: ${extra || 'Ninguno'}
-- Mercado / País: México (Mercado Libre México y Amazon México)
-
-Por favor proporciona un resumen conciso y útil con:
-1. Rango de precio estimado promedio por bobina de 1kg en México (en MXN) para esta marca/material.
-2. Recomendación de dónde suele convenir más (Mercado Libre vs Amazon: tiempos de entrega Prime/Full, costo de envío, promociones típicas de paquetes de 2 o más bobinas).
-3. Breve consejo técnico sobre esta combinación de marca, material o acabado.`
-
-    const reqBody = JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }]
-    })
-
-    const apiHost = 'generativelanguage.googleapis.com'
-    const modelosParaIntentar = [
-      'gemini-3.6-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-3.7-flash',
-      'gemini-3.8-flash'
-    ]
-
-    let respuestaTexto = null
-    let ultimoError = null
-
-    for (const mod of modelosParaIntentar) {
-      try {
-        const apiPath = `/v1beta/models/${mod}:generateContent?key=${apiKey}`
-        respuestaTexto = await new Promise((resolve, reject) => {
-          const options = {
-            hostname: apiHost,
-            port: 443,
-            path: apiPath,
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(reqBody)
-            }
-          }
-          const timeout = setTimeout(() => reject(new Error('Tiempo de espera agotado al consultar Gemini')), 12000)
-          const req = https.request(options, res => {
-            let respData = ''
-            res.on('data', chunk => { respData += chunk })
-            res.on('end', () => {
-              clearTimeout(timeout)
-              try {
-                const parsed = JSON.parse(respData)
-                if (res.statusCode >= 200 && res.statusCode < 300) {
-                  const candidateText = parsed?.candidates?.[0]?.content?.parts?.[0]?.text
-                  if (candidateText) return resolve(candidateText)
-                }
-                const errMsg = parsed?.error?.message || `HTTP ${res.statusCode}`
-                reject(new Error(errMsg))
-              } catch (e) {
-                reject(e)
-              }
-            })
-          })
-          req.on('error', e => { clearTimeout(timeout); reject(e) })
-          req.write(reqBody)
-          req.end()
-        })
-        if (respuestaTexto) break
-      } catch (err) {
-        ultimoError = err
-      }
-    }
-
-    if (!respuestaTexto && ultimoError) {
-      throw ultimoError
-    }
-
-    return {
-      ok: true,
-      hasGemini: true,
-      query: queryLimpia,
-      urlML,
-      urlAmazon,
-      resumen: respuestaTexto
-    }
-  } catch (err) {
-    return {
-      ok: true,
-      hasGemini: false,
-      query: queryLimpia,
-      urlML,
-      urlAmazon,
-      error: err.message,
-      resumen: `No se pudo conectar con la API de Gemini (${err.message}), pero puedes comparar los precios directamente en Mercado Libre y Amazon con los botones a continuación.`
-    }
-  }
+ipcMain.handle('buscar-precios-filamento', async (_, data) => {
+  return buildFilamentoSearchUrls(data)
 })

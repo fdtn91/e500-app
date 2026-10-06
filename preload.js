@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   ajustarStock:      (p, d)      => ipcRenderer.invoke('ajustar-stock', p, d),
   getStockMinimo:    ()          => ipcRenderer.invoke('get-stock-minimo'),
   getAlertasStock:   (p)         => ipcRenderer.invoke('get-alertas-stock', p),
-  buscarPreciosGemini:(d)        => ipcRenderer.invoke('buscar-precios-gemini', d),
+  buscarPreciosTiendas:(d)       => ipcRenderer.invoke('buscar-precios-filamento', d),
 
   // ── Impresiones ──────────────────────────────────────────
   getImpresiones:    (p)         => ipcRenderer.invoke('get-impresiones', p),

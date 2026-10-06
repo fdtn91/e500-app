@@ -322,6 +322,56 @@ tr:hover td{ background:var(--s2); }
   color:var(--accent); padding:8px 4px 4px;
   border-bottom:1px solid var(--border); margin-bottom:4px;
 }
+
+/* ── TARJETAS LOGOS DE TIENDAS (MERCADO LIBRE & AMAZON) ── */
+.store-card {
+  border-radius: 12px;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, filter .18s ease;
+  user-select: none;
+  outline: none;
+}
+.store-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.store-card-ml {
+  background: linear-gradient(135deg, #fff259 0%, #ffe600 100%);
+  border: 2px solid #ecd500;
+  color: #2d3277;
+  box-shadow: 0 4px 14px rgba(255, 230, 0, 0.28);
+}
+.store-card-ml:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: #2d3277;
+  box-shadow: 0 8px 22px rgba(255, 230, 0, 0.5);
+  filter: brightness(1.02);
+}
+.store-card-ml:active {
+  transform: translateY(0) scale(0.99);
+}
+.store-card-amazon {
+  background: linear-gradient(135deg, #1f2833 0%, #131921 100%);
+  border: 2px solid #2e3b4e;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.store-card-amazon:hover {
+  transform: translateY(-3px) scale(1.01);
+  border-color: #ff9900;
+  box-shadow: 0 8px 22px rgba(255, 153, 0, 0.35);
+  filter: brightness(1.05);
+}
+.store-card-amazon:active {
+  transform: translateY(0) scale(0.99);
+}
 </style>
 </head>
 <body>
@@ -602,16 +652,6 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcel)">Abrir Excel E500</button>
             <button class="btn btn-secondary" onclick="api.openExcel(cfg.rutaExcelMonsan)">Abrir Excel MONSAN</button>
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Inteligencia Artificial (Gemini)</div>
-          <div class="field">
-            <label>API Key de Google Gemini (Opcional)</label>
-            <input type="password" id="cfgGeminiKey" placeholder="AIzaSy..." />
-            <div style="font-size:10px;color:var(--text2);margin-top:4px;">
-              Permite a Gemini analizar precios, comparar Mercado Libre vs Amazon y brindarte recomendaciones de filamento en México.
-            </div>
           </div>
         </div>
 
@@ -1007,13 +1047,18 @@ tr:hover td{ background:var(--s2); }
 </div>
 
 <!-- ══════════════════════════════════════
-     MODAL: COMPARADOR DE PRECIOS (GEMINI)
+     MODAL: COMPARADOR DE PRECIOS EN TIENDAS
 ══════════════════════════════════════ -->
 <div class="modal-backdrop" id="modalComparador">
   <div class="modal" style="width:620px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div class="modal-title" style="margin-bottom:0;display:flex;align-items:center;gap:8px;">
-        🤖 Comparador de Precios con Gemini
+      <div>
+        <div class="modal-title" style="margin-bottom:2px;display:flex;align-items:center;gap:8px;">
+          🛒 Comparador de Precios
+        </div>
+        <div style="font-size:11px;color:var(--muted);">
+          Compara precios y disponibilidad haciendo clic en los logos de Mercado Libre y Amazon México
+        </div>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="closeModal('modalComparador')" style="padding:2px 8px;">✕</button>
     </div>
@@ -1031,52 +1076,79 @@ tr:hover td{ background:var(--s2); }
     <div class="form-grid form-grid-3" style="margin-bottom:12px;">
       <div class="field">
         <label>Marca</label>
-        <input type="text" id="mCompMarca" placeholder="Ej: Sunlu, Kardenal..." />
+        <input type="text" id="mCompMarca" placeholder="Ej: Sunlu, Kardenal..." oninput="actualizarBusquedaComparador()" />
       </div>
       <div class="field">
         <label>Material</label>
-        <input type="text" id="mCompTipo" placeholder="Ej: PLA, PETG, TPU..." />
+        <input type="text" id="mCompTipo" placeholder="Ej: PLA, PETG, TPU..." oninput="actualizarBusquedaComparador()" />
       </div>
       <div class="field">
         <label>Color</label>
-        <input type="text" id="mCompColor" placeholder="Ej: Azul Matte, Blanco..." />
+        <input type="text" id="mCompColor" placeholder="Ej: Azul Matte, Blanco..." oninput="actualizarBusquedaComparador()" />
       </div>
     </div>
 
     <div class="field" style="margin-bottom:14px;">
       <label style="font-weight:600;">Datos extra para la búsqueda (opcional)</label>
       <div style="display:flex;gap:8px;">
-        <input type="text" id="mCompExtra" placeholder="Ej: 1kg 1.75mm, alta velocidad, oferta, paquete 2 rollos..." style="flex:1;" onkeydown="if(event.key==='Enter') ejecutarBusquedaComparador()" />
-        <button class="btn btn-primary" onclick="ejecutarBusquedaComparador()" id="btnEjecutarBusquedaComp" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
-          🔍 Buscar ahora
+        <input type="text" id="mCompExtra" placeholder="Ej: 1kg 1.75mm, alta velocidad, oferta, paquete 2 rollos..." style="flex:1;" oninput="actualizarBusquedaComparador()" onkeydown="if(event.key==='Enter') actualizarBusquedaComparador()" />
+        <button class="btn btn-secondary" onclick="actualizarBusquedaComparador()" id="btnEjecutarBusquedaComp" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
+          🔄 Actualizar
         </button>
       </div>
     </div>
 
-    <!-- Estado de carga -->
-    <div id="mCompLoading" style="display:none;text-align:center;padding:24px 12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
-      <div style="font-size:24px;animation:spin 1s linear infinite;display:inline-block;margin-bottom:8px;">⏳</div>
-      <div style="font-size:12px;color:var(--text);font-weight:600;">Comparando precios y analizando opciones con Gemini...</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Consultando mercado en Mercado Libre y Amazon México</div>
+    <!-- Indicador de consulta activa -->
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px;background:var(--s2);padding:9px 12px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+      <div>Búsqueda: <strong id="mCompQueryPreview" style="color:var(--accent);font-family:monospace;">filamento</strong></div>
+      <div style="font-size:10px;color:var(--muted);">Haz clic en el logo para abrir los resultados en tu navegador</div>
     </div>
 
-    <!-- Botones directos a Mercado Libre y Amazon -->
-    <div id="mCompEnlacesBox" style="display:none;margin-bottom:14px;">
-      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">Enlaces directos de compra en México:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button class="btn btn-secondary" onclick="abrirLinkML()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#ffe600;color:#2d3277;font-weight:800;border:none;">
-          💛 Mercado Libre México ↗
-        </button>
-        <button class="btn btn-secondary" onclick="abrirLinkAmazon()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#232f3e;color:#ff9900;font-weight:800;border:none;">
-          📦 Amazon México ↗
-        </button>
+    <!-- Logos interactivos clicables de Mercado Libre y Amazon -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <!-- Logo Mercado Libre -->
+      <div class="store-card store-card-ml" onclick="abrirLinkML()" role="button" tabindex="0" title="Ver ofertas en Mercado Libre México">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <svg viewBox="0 0 48 34" style="height:36px;width:50px;flex-shrink:0;" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="24" cy="17" rx="22" ry="15" fill="#FFE600" stroke="#2D3277" stroke-width="2.2"/>
+            <path d="M9.7 11.5a20.8 20.8 0 0 0 6.4 1.9 22.8 22.8 0 0 0 4.5-.8" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M38.9 11.6a8.6 8.6 0 0 1-5.2 1.5c-3.3 0-6.2-2.2-9.2-2.2-2.7 0-7.2 4.4-7.2 5.2s1.3 1.2 2.4.7c.6-.3 3.3-2.9 5.5-2.9s9.2 7.1 9.8 7.8c1 1-1 3.3-2.1 2s-3.4-3.1-3.4-3.1" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M41 18a24 24 0 0 0-8.5 2.7" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M32.6 23.5c1 1-.9 3.2-2.2 2s-2.5-2.5-2.5-2.5" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M30.1 25.2c1 1-.9 3.3-2.1 2s-2-1.9-2-1.9" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M24.2 27.3a2.3 2.3 0 0 0 3.6-.2" stroke="#2D3277" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M24.2 27.3c.5-.7.5-3.2-2.2-2.7.6-1.2.1-3.1-2.4-2a1.7 1.7 0 0 0-3.2-.6 1.5 1.5 0 0 0-2.8-.3c-.5 1.1.3 3.1 2.1 2-.2 1.9.8 2.5 2.7 1.8.1 1.9 1.4 1.7 2.3 1.3a1.9 1.9 0 0 0 1.5.5z" stroke="#2D3277" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div style="text-align:left;">
+            <div style="font-size:17px;font-weight:900;color:#2D3277;letter-spacing:-0.5px;line-height:1.1;">mercado libre</div>
+            <div style="font-size:11px;font-weight:700;color:#2D3277;opacity:0.85;">México ↗</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#2D3277;font-weight:700;display:flex;align-items:center;gap:4px;margin-top:4px;">
+          <span>⚡ Clic para ver precios y ofertas Full</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Resultado / Análisis de Gemini -->
-    <div id="mCompResultadoBox" style="display:none;">
-      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">💡 Análisis comparativo y recomendación:</div>
-      <div id="mCompResumen" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6;color:var(--text);white-space:pre-wrap;max-height:220px;overflow-y:auto;"></div>
+      <!-- Logo Amazon -->
+      <div class="store-card store-card-amazon" onclick="abrirLinkAmazon()" role="button" tabindex="0" title="Ver precios en Amazon México">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <svg viewBox="0 0 603 182" style="height:36px;width:120px;" xmlns="http://www.w3.org/2000/svg">
+            <path d="m 374 142 c -35 26 -85.7 39.6 -129.4 39.6 -61.2 0 -116.4 -22.7 -158.1 -60.3 -3.3 -3 -0.3 -7 3.6 -4.7 45 26.2 100.7 41.9 158.2 41.9 38.8 0 81.4 -8 120.6 -24.7 5.9 -2.5 10.9 3.9 5.1 8.2" fill="#ff9900"/>
+            <path d="m 388.6 125.5 c -4.5 -5.7 -29.6 -2.7 -40.8 -1.4 -3.4 0.4 -4 -2.6 -0.9 -4.7 20 -14.1 52.8 -10 56.7 -5.3 3.8 4.7 -1 37.6 -19.8 53.4 -2.9 2.4 -5.6 1.1 -4.4 -2.1 4.2 -10.5 13.7 -34.2 9.2 -39.9" fill="#ff9900"/>
+            <path d="M 348.5 20.1 V 6.4 c 0 -2.1 1.6 -3.5 3.5 -3.5 h 61.3 c 2 0 3.5 1.4 3.5 3.5 v 11.7 c 0 2 -1.7 4.5 -4.6 8.6 l -31.7 45.3 c 11.8 -0.3 24.3 1.5 34.9 7.5 2.4 1.4 3.1 3.4 3.3 5.3 v 14.7 c 0 2 -2.2 4.3 -4.5 3.1 -18.8 -9.9 -43.9 -11 -64.7 0.1 -2.1 1.2 -4.4 -1.2 -4.4 -3.1 V 85.7 c 0 -2.2 0 -6 2.3 -9.4 l 36.8 -52.7 h -32 c -2 0 -3.5 -1.4 -3.5 -3.5" fill="#ffffff"/>
+            <path d="m 125 105.5 h -18.6 c -1.8 -0.1 -3.2 -1.5 -3.3 -3.2 V 6.6 c 0 -1.9 1.6 -3.4 3.6 -3.4 h 17.4 c 1.8 0.1 3.3 1.5 3.4 3.2 v 12.5 h 0.3 c 4.5 -12.1 13.1 -17.7 24.5 -17.7 11.7 0 19 5.6 24.2 17.7 4.5 -12.1 14.8 -17.7 25.7 -17.7 7.8 0 16.4 3.2 21.6 10.5 5.9 8 4.7 19.7 4.7 30 l 0 60.4 c 0 1.9 -1.6 3.5 -3.6 3.5 h -18.6 c -1.9 -0.1 -3.4 -1.6 -3.4 -3.5 V 51.3 c 0 -4 0.4 -14.1 -0.5 -17.9 -1.4 -6.4 -5.6 -8.2 -11 -8.2 -4.5 0 -9.2 3 -11.1 7.8 -1.2 3.1 -1.4 8.7 -1.4 14.1 v 54.9 c 0 1.9 -1.6 3.5 -3.6 3.5 h -18.6 c -1.9 -0.1 -3.4 -1.6 -3.4 -3.5 V 51.3 c 0 -4.2 0.3 -14 -0.6 -17.9 -1.3 -6.1 -5.4 -8.2 -10.8 -8.2 -4.5 0 -9.2 3 -11.1 7.9 -1.3 3.3 -1.4 8.7 -1.4 14 v 55 c 0 1.9 -1.6 3.4 -3.6 3.4" fill="#ffffff"/>
+            <path d="m 67.2 46.1 c -1.2 -0.8 -3.1 -1.4 -5.4 -1.4 -10.7 0 -16.8 7.3 -16.8 19.1 0 10.7 5.7 17.3 15.6 17.3 3 0 5.4 -0.8 6.6 -1.8 v -33.2 z m 25.1 55.8 c -1.8 1.4 -3.9 2.2 -6.2 2.2 -2.5 0 -4.3 -1 -5.7 -2.8 l -0.3 -0.4 c -3.9 4.1 -9.5 5.8 -15.9 5.8 -14.1 0 -24.4 -8.8 -24.4 -24.1 0 -12.9 8.2 -21.9 20.3 -24.4 7.2 -1.5 15.6 -1.7 20.7 -2.1 v -4.3 c 0 -7.2 -4.3 -11.1 -12.9 -11.1 -5.5 0 -10.4 1.8 -13.6 4.7 -1.2 1.1 -2.7 1.7 -4.4 1.7 -2.5 0 -4.7 -1.7 -4.7 -4.6 0 -1.8 0.9 -3.3 2.5 -4.5 5.7 -4.4 13.9 -6.8 22.4 -6.8 16.5 0 25.4 7.6 25.4 22.6 v 40.5 c 0 2.8 1.4 4.5 3.3 6.6 0.9 1 1.4 2.2 1.4 3.4 0 2.5 -2.2 4.6 -4.8 4.6 -1.2 0 -2.4 -0.4 -3.6 -1.3" fill="#ffffff"/>
+            <path d="m 510.6 45.4 c -14.8 0 -25.2 12.3 -25.2 29.5 0 17 10.1 29.5 25.2 29.5 15.1 0 25.3 -12.4 25.3 -29.5 0 -17.2 -10.2 -29.5 -25.3 -29.5 m 0 74.3 c -24.5 0 -42.8 -18.7 -42.8 -44.8 0 -25.8 18.7 -44.8 42.8 -44.8 24.1 0 42.9 18.9 42.9 44.8 0 26.1 -18.8 44.8 -42.9 44.8" fill="#ffffff"/>
+            <path d="m 567 105.5 h -16.8 c -2 0 -3.6 -1.6 -3.6 -3.5 V 34.6 c 0 -2 1.6 -3.5 3.6 -3.5 H 567 c 1.9 0 3.5 1.5 3.5 3.5 v 9.2 h 0.3 c 4.6 -8.9 12.6 -13.7 22.3 -13.7 14.8 0 25.7 10.3 25.7 27.2 v 44.7 c 0 2 -1.6 3.5 -3.6 3.5 h -16.8 c -2 0 -3.6 -1.6 -3.6 -3.5 V 59.8 c 0 -8.9 -4.7 -13.9 -12.5 -13.9 -6.8 0 -12.6 5.1 -14.3 12.8 -0.4 1.8 -0.6 3.9 -0.6 6.1 v 37.2 c 0 1.9 -1.6 3.5 -3.6 3.5" fill="#ffffff"/>
+          </svg>
+          <div style="text-align:left;">
+            <div style="font-size:11px;font-weight:700;color:#ff9900;opacity:0.95;">México ↗</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:#ff9900;font-weight:700;display:flex;align-items:center;gap:4px;margin-top:4px;">
+          <span>📦 Clic para ver precios y entrega Prime</span>
+        </div>
+      </div>
     </div>
 
     <div class="modal-footer" style="margin-top:16px;">
@@ -1196,8 +1268,6 @@ function renderConfig () {
   document.getElementById('cfgWatts').value     = cfg.wattsPrinter || ''
   document.getElementById('cfgMoonraker').value = cfg.moonrakerUrl || 'http://192.168.68.113'
   document.getElementById('cfgCamara').value    = cfg.camaraUrl    || 'http://192.168.68.113:8080/?action=stream'
-  const elGemini = document.getElementById('cfgGeminiKey')
-  if (elGemini) elGemini.value = cfg.geminiApiKey || ''
 }
 
 async function saveConfig () {
@@ -1205,8 +1275,6 @@ async function saveConfig () {
   cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value)     || 0
   cfg.moonrakerUrl = document.getElementById('cfgMoonraker').value.trim()       || cfg.moonrakerUrl
   cfg.camaraUrl    = document.getElementById('cfgCamara').value.trim()          || cfg.camaraUrl
-  const elGemini   = document.getElementById('cfgGeminiKey')
-  if (elGemini) cfg.geminiApiKey = elGemini.value.trim()
   await api.saveConfig(cfg)
   renderConfig()
   alert('Configuración guardada.')
@@ -1307,8 +1375,8 @@ function renderFilamentos () {
         <div class="fil-card-actions" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
           <div style="display:flex;gap:4px;width:100%;">
             <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})">⚖️ Stock</button>
-            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:3px;" onclick="abrirComparadorFilamento(${f._idx})" title="Buscar precios con Gemini en Mercado Libre y Amazon">
-              🤖 Buscar
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:3px;" onclick="abrirComparadorFilamento(${f._idx})" title="Comparar precios en Mercado Libre y Amazon México">
+              🛒 Precios
             </button>
           </div>
           <div style="display:flex;gap:4px;width:100%;">
@@ -1557,7 +1625,7 @@ async function guardarAjusteStock () {
 }
 
 // ════════════════════════════════════════════════════════════
-//  COMPARADOR DE PRECIOS CON GEMINI (MERCADOLIBRE & AMAZON)
+//  COMPARADOR DE PRECIOS EN TIENDAS (MERCADO LIBRE & AMAZON)
 // ════════════════════════════════════════════════════════════
 let comparadorUrls = { ml: '', amazon: '' }
 
@@ -1582,61 +1650,34 @@ function abrirComparadorFilamento (idx) {
   document.getElementById('mCompColor').value = f.colorNombre || ''
   document.getElementById('mCompExtra').value = '1kg 1.75mm'
 
-  document.getElementById('mCompLoading').style.display      = 'none'
-  document.getElementById('mCompEnlacesBox').style.display    = 'none'
-  document.getElementById('mCompResultadoBox').style.display  = 'none'
-  document.getElementById('mCompResumen').textContent        = ''
-
+  actualizarBusquedaComparador()
   openModal('modalComparador')
-
-  // Disparar búsqueda automáticamente
-  setTimeout(() => {
-    ejecutarBusquedaComparador()
-  }, 150)
 }
 
-async function ejecutarBusquedaComparador () {
-  const marca = document.getElementById('mCompMarca').value.trim()
-  const tipo  = document.getElementById('mCompTipo').value.trim()
-  const color = document.getElementById('mCompColor').value.trim()
-  const extra = document.getElementById('mCompExtra').value.trim()
+function actualizarBusquedaComparador () {
+  const marca = (document.getElementById('mCompMarca')?.value || '').trim()
+  const tipo  = (document.getElementById('mCompTipo')?.value || '').trim()
+  const color = (document.getElementById('mCompColor')?.value || '').trim()
+  const extra = (document.getElementById('mCompExtra')?.value || '').trim()
 
-  const btn = document.getElementById('btnEjecutarBusquedaComp')
-  if (btn) btn.disabled = true
+  const partes = ['filamento', tipo, marca, color, extra].filter(Boolean)
+  const qLimpia = partes.join(' ').replace(/\s+/g, ' ').trim()
+  const qEncoded = encodeURIComponent(qLimpia)
 
-  document.getElementById('mCompLoading').style.display      = 'block'
-  document.getElementById('mCompEnlacesBox').style.display    = 'none'
-  document.getElementById('mCompResultadoBox').style.display  = 'none'
+  comparadorUrls.ml = `https://listado.mercadolibre.com.mx/${qEncoded}`
+  comparadorUrls.amazon = `https://www.amazon.com.mx/s?k=${qEncoded}`
 
-  try {
-    const res = await api.buscarPreciosGemini({ marca, tipo, color, extra })
-    document.getElementById('mCompLoading').style.display = 'none'
-
-    if (res && res.ok) {
-      comparadorUrls.ml     = res.urlML || ''
-      comparadorUrls.amazon = res.urlAmazon || ''
-
-      document.getElementById('mCompEnlacesBox').style.display   = 'block'
-      document.getElementById('mCompResultadoBox').style.display = 'block'
-      document.getElementById('mCompResumen').textContent       = res.resumen || 'Búsqueda completada.'
-    } else {
-      document.getElementById('mCompResultadoBox').style.display = 'block'
-      document.getElementById('mCompResumen').textContent       = 'Error al realizar la consulta: ' + ((res && res.error) || 'Desconocido')
-    }
-  } catch (err) {
-    document.getElementById('mCompLoading').style.display      = 'none'
-    document.getElementById('mCompResultadoBox').style.display  = 'block'
-    document.getElementById('mCompResumen').textContent        = 'Error de comunicación: ' + err.message
-  } finally {
-    if (btn) btn.disabled = false
-  }
+  const preview = document.getElementById('mCompQueryPreview')
+  if (preview) preview.textContent = qLimpia || 'filamento'
 }
 
 function abrirLinkML () {
+  actualizarBusquedaComparador()
   if (comparadorUrls.ml) api.openExternal(comparadorUrls.ml)
 }
 
 function abrirLinkAmazon () {
+  actualizarBusquedaComparador()
   if (comparadorUrls.amazon) api.openExternal(comparadorUrls.amazon)
 }
 
