@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   saveConfig:        (cfg)       => ipcRenderer.invoke('save-config', cfg),
   selectExcel:       (def)       => ipcRenderer.invoke('select-excel', def),
   openExcel:         (p)         => ipcRenderer.invoke('open-excel', p),
+  openExternal:      (url)       => ipcRenderer.invoke('open-external', url),
 
   // ── Filamentos ───────────────────────────────────────────
   getFilamentos:     (p)         => ipcRenderer.invoke('get-filamentos', p),
@@ -21,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   ajustarStock:      (p, d)      => ipcRenderer.invoke('ajustar-stock', p, d),
   getStockMinimo:    ()          => ipcRenderer.invoke('get-stock-minimo'),
   getAlertasStock:   (p)         => ipcRenderer.invoke('get-alertas-stock', p),
+  buscarPreciosGemini:(d)        => ipcRenderer.invoke('buscar-precios-gemini', d),
 
   // ── Impresiones ──────────────────────────────────────────
   getImpresiones:    (p)         => ipcRenderer.invoke('get-impresiones', p),

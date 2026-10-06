@@ -130,6 +130,22 @@ th{
   background:var(--s2); color:var(--text2); font-size:9px; font-weight:700;
   letter-spacing:.12em; text-transform:uppercase; padding:8px 12px;
   text-align:left; border-bottom:1px solid var(--border);
+  user-select:none;
+}
+th.sortable{
+  cursor:pointer; transition:color .15s, background .15s;
+}
+th.sortable:hover{
+  color:var(--text); background:var(--s3);
+}
+th.sortable.active{
+  color:var(--accent); background:rgba(0,217,255,.08);
+}
+.th-sort-icon{
+  display:inline-block; margin-left:4px; font-size:10px; color:var(--muted);
+}
+th.sortable.active .th-sort-icon{
+  color:var(--accent);
 }
 td{ padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
 tr:hover td{ background:var(--s2); }
@@ -443,10 +459,18 @@ tr:hover td{ background:var(--s2); }
             <select id="selectSortImp" onchange="cambiarSortImp(this.value)" style="background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:11px;outline:none;">
               <option value="fecha_desc">📅 Fecha (Más reciente)</option>
               <option value="fecha_asc">📅 Fecha (Más antigua)</option>
-              <option value="material_asc">🏷️ Tipo de Material (A-Z)</option>
-              <option value="color_asc">🎨 Color / Filamento (A-Z)</option>
-              <option value="consumo_desc">⚖️ Consumo Material (Mayor a menor)</option>
-              <option value="consumo_asc">⚖️ Consumo Material (Menor a mayor)</option>
+              <option value="desc_asc">📝 Descripción (A-Z)</option>
+              <option value="desc_desc">📝 Descripción (Z-A)</option>
+              <option value="material_asc">🏷️ Material / Color (A-Z)</option>
+              <option value="material_desc">🏷️ Material / Color (Z-A)</option>
+              <option value="consumo_desc">⚖️ Gramos (Mayor a menor)</option>
+              <option value="consumo_asc">⚖️ Gramos (Menor a mayor)</option>
+              <option value="tiempo_desc">⏱️ Tiempo (Mayor a menor)</option>
+              <option value="tiempo_asc">⏱️ Tiempo (Menor a mayor)</option>
+              <option value="cat_asc">📁 Categoría (A-Z)</option>
+              <option value="cat_desc">📁 Categoría (Z-A)</option>
+              <option value="costo_desc">💲 Costo (Mayor a menor)</option>
+              <option value="costo_asc">💲 Costo (Menor a mayor)</option>
             </select>
           </div>
           <div style="flex:1;min-width:180px;">
@@ -483,10 +507,33 @@ tr:hover td{ background:var(--s2); }
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Fecha</th><th>Descripción</th><th>Material / Color</th>
-              <th>Gramos</th><th>Tiempo</th><th>Categoría</th>
-              <th>Resultado</th><th>Costo</th><th></th>
+              <th class="sortable" onclick="ordenarPorColumna('fecha')" title="Clic para ordenar por fecha">
+                Fecha <span class="th-sort-icon" id="sortIcon-fecha">▼</span>
+              </th>
+              <th class="sortable" onclick="ordenarPorColumna('descripcion')" title="Clic para ordenar por descripción">
+                Descripción <span class="th-sort-icon" id="sortIcon-descripcion">↕</span>
+              </th>
+              <th class="sortable" onclick="ordenarPorColumna('material')" title="Clic para ordenar por material / color">
+                Material / Color <span class="th-sort-icon" id="sortIcon-material">↕</span>
+              </th>
+              <th class="sortable" onclick="ordenarPorColumna('gramos')" title="Clic para ordenar por gramos consumidos">
+                Gramos <span class="th-sort-icon" id="sortIcon-gramos">↕</span>
+              </th>
+              <th class="sortable" onclick="ordenarPorColumna('tiempo')" title="Clic para ordenar por tiempo">
+                Tiempo <span class="th-sort-icon" id="sortIcon-tiempo">↕</span>
+              </th>
+              <th class="sortable" onclick="ordenarPorColumna('categoria')" title="Clic para ordenar por categoría">
+                Categoría <span class="th-sort-icon" id="sortIcon-categoria">↕</span>
+              </th>
+              <th>Resultado</th>
+              <th class="sortable" onclick="ordenarPorColumna('costo')" title="Clic para ordenar por costo">
+                Costo <span class="th-sort-icon" id="sortIcon-costo">↕</span>
+              </th>
+              <th></th>
             </tr></thead>
+            <tbody id="bodyImpresiones"></tbody>
+          </table>
+        </div>
             <tbody id="bodyImpresiones"></tbody>
           </table>
         </div>
@@ -560,6 +607,17 @@ tr:hover td{ background:var(--s2); }
             <button class="btn btn-warn"      onclick="syncMonsan()">⟳ Sincronizar stock con MONSAN</button>
           </div>
         </div>
+        <div class="card">
+          <div class="card-title">Inteligencia Artificial (Gemini)</div>
+          <div class="field">
+            <label>API Key de Google Gemini (Opcional)</label>
+            <input type="password" id="cfgGeminiKey" placeholder="AIzaSy..." />
+            <div style="font-size:10px;color:var(--text2);margin-top:4px;">
+              Permite a Gemini analizar precios, comparar Mercado Libre vs Amazon y brindarte recomendaciones de filamento en México.
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-title">Impresora (Moonraker)</div>
           <div class="form-grid form-grid-2">
@@ -951,6 +1009,85 @@ tr:hover td{ background:var(--s2); }
   </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     MODAL: COMPARADOR DE PRECIOS (GEMINI)
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalComparador">
+  <div class="modal" style="width:620px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div class="modal-title" style="margin-bottom:0;display:flex;align-items:center;gap:8px;">
+        🤖 Comparador de Precios con Gemini
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modalComparador')" style="padding:2px 8px;">✕</button>
+    </div>
+
+    <!-- Tarjeta del filamento seleccionado -->
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+      <div id="mCompSwatch" style="width:36px;height:36px;border-radius:6px;border:1px solid var(--border);flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div id="mCompNombre" style="font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        <div id="mCompMeta" style="font-size:11px;color:var(--text2);margin-top:2px;">—</div>
+      </div>
+    </div>
+
+    <!-- Parámetros de búsqueda -->
+    <div class="form-grid form-grid-3" style="margin-bottom:12px;">
+      <div class="field">
+        <label>Marca</label>
+        <input type="text" id="mCompMarca" placeholder="Ej: Sunlu, Kardenal..." />
+      </div>
+      <div class="field">
+        <label>Material</label>
+        <input type="text" id="mCompTipo" placeholder="Ej: PLA, PETG, TPU..." />
+      </div>
+      <div class="field">
+        <label>Color</label>
+        <input type="text" id="mCompColor" placeholder="Ej: Azul Matte, Blanco..." />
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label style="font-weight:600;">Datos extra para la búsqueda (opcional)</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="mCompExtra" placeholder="Ej: 1kg 1.75mm, alta velocidad, oferta, paquete 2 rollos..." style="flex:1;" onkeydown="if(event.key==='Enter') ejecutarBusquedaComparador()" />
+        <button class="btn btn-primary" onclick="ejecutarBusquedaComparador()" id="btnEjecutarBusquedaComp" style="white-space:nowrap;display:flex;align-items:center;gap:6px;">
+          🔍 Buscar ahora
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado de carga -->
+    <div id="mCompLoading" style="display:none;text-align:center;padding:24px 12px;background:var(--s2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
+      <div style="font-size:24px;animation:spin 1s linear infinite;display:inline-block;margin-bottom:8px;">⏳</div>
+      <div style="font-size:12px;color:var(--text);font-weight:600;">Comparando precios y analizando opciones con Gemini...</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;">Consultando mercado en Mercado Libre y Amazon México</div>
+    </div>
+
+    <!-- Botones directos a Mercado Libre y Amazon -->
+    <div id="mCompEnlacesBox" style="display:none;margin-bottom:14px;">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">Enlaces directos de compra en México:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button class="btn btn-secondary" onclick="abrirLinkML()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#ffe600;color:#2d3277;font-weight:800;border:none;">
+          💛 Mercado Libre México ↗
+        </button>
+        <button class="btn btn-secondary" onclick="abrirLinkAmazon()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:#232f3e;color:#ff9900;font-weight:800;border:none;">
+          📦 Amazon México ↗
+        </button>
+      </div>
+    </div>
+
+    <!-- Resultado / Análisis de Gemini -->
+    <div id="mCompResultadoBox" style="display:none;">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:6px;letter-spacing:.05em;">💡 Análisis comparativo y recomendación:</div>
+      <div id="mCompResumen" style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.6;color:var(--text);white-space:pre-wrap;max-height:220px;overflow-y:auto;"></div>
+    </div>
+
+    <div class="modal-footer" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalComparador')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════════════════
 //  ESTADO
@@ -1062,6 +1199,8 @@ function renderConfig () {
   document.getElementById('cfgWatts').value     = cfg.wattsPrinter || ''
   document.getElementById('cfgMoonraker').value = cfg.moonrakerUrl || 'http://192.168.68.113'
   document.getElementById('cfgCamara').value    = cfg.camaraUrl    || 'http://192.168.68.113:8080/?action=stream'
+  const elGemini = document.getElementById('cfgGeminiKey')
+  if (elGemini) elGemini.value = cfg.geminiApiKey || ''
 }
 
 async function saveConfig () {
@@ -1069,6 +1208,8 @@ async function saveConfig () {
   cfg.wattsPrinter = parseFloat(document.getElementById('cfgWatts').value)     || 0
   cfg.moonrakerUrl = document.getElementById('cfgMoonraker').value.trim()       || cfg.moonrakerUrl
   cfg.camaraUrl    = document.getElementById('cfgCamara').value.trim()          || cfg.camaraUrl
+  const elGemini   = document.getElementById('cfgGeminiKey')
+  if (elGemini) cfg.geminiApiKey = elGemini.value.trim()
   await api.saveConfig(cfg)
   renderConfig()
   alert('Configuración guardada.')
@@ -1167,7 +1308,12 @@ function renderFilamentos () {
           <span style="color:${color};font-family:monospace;font-weight:700;">${pct}%</span>
         </div>
         <div class="fil-card-actions" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
-          <button class="btn btn-primary btn-sm" style="width:100%;font-size:10px;padding:4px 6px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})">⚖️ Ajustar Stock</button>
+          <div style="display:flex;gap:4px;width:100%;">
+            <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})">⚖️ Stock</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:4px 6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:3px;" onclick="abrirComparadorFilamento(${f._idx})" title="Buscar precios con Gemini en Mercado Libre y Amazon">
+              🤖 Buscar
+            </button>
+          </div>
           <div style="display:flex;gap:4px;width:100%;">
             <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:3px 4px;" onclick="editFilamento(${f._idx})">Editar</button>
             <button class="btn btn-danger btn-sm" style="font-size:10px;padding:3px 6px;" onclick="deleteFilamento('${f.nombre}')">✕</button>
@@ -1414,6 +1560,90 @@ async function guardarAjusteStock () {
 }
 
 // ════════════════════════════════════════════════════════════
+//  COMPARADOR DE PRECIOS CON GEMINI (MERCADOLIBRE & AMAZON)
+// ════════════════════════════════════════════════════════════
+let comparadorUrls = { ml: '', amazon: '' }
+
+function abrirComparadorFilamento (idx) {
+  const f = filamentos.find(x => x._idx === idx || x.id === idx) || filamentos[idx]
+  if (!f) return
+
+  document.getElementById('mCompNombre').textContent = f.nombre
+  document.getElementById('mCompMeta').textContent = `${f.tipo} · ${f.marca || 'Sin marca'} · $${(+f.costoKg||0).toFixed(0)}/kg en registro`
+  
+  const swatch = document.getElementById('mCompSwatch')
+  if (f.colorHex2) {
+    swatch.style.background = f.colorHex3
+      ? `linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
+      : `linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`
+  } else {
+    swatch.style.background = f.colorHex || '#888'
+  }
+
+  document.getElementById('mCompMarca').value = f.marca || ''
+  document.getElementById('mCompTipo').value  = f.tipo || 'PLA'
+  document.getElementById('mCompColor').value = f.colorNombre || ''
+  document.getElementById('mCompExtra').value = '1kg 1.75mm'
+
+  document.getElementById('mCompLoading').style.display      = 'none'
+  document.getElementById('mCompEnlacesBox').style.display    = 'none'
+  document.getElementById('mCompResultadoBox').style.display  = 'none'
+  document.getElementById('mCompResumen').textContent        = ''
+
+  openModal('modalComparador')
+
+  // Disparar búsqueda automáticamente
+  setTimeout(() => {
+    ejecutarBusquedaComparador()
+  }, 150)
+}
+
+async function ejecutarBusquedaComparador () {
+  const marca = document.getElementById('mCompMarca').value.trim()
+  const tipo  = document.getElementById('mCompTipo').value.trim()
+  const color = document.getElementById('mCompColor').value.trim()
+  const extra = document.getElementById('mCompExtra').value.trim()
+
+  const btn = document.getElementById('btnEjecutarBusquedaComp')
+  if (btn) btn.disabled = true
+
+  document.getElementById('mCompLoading').style.display      = 'block'
+  document.getElementById('mCompEnlacesBox').style.display    = 'none'
+  document.getElementById('mCompResultadoBox').style.display  = 'none'
+
+  try {
+    const res = await api.buscarPreciosGemini({ marca, tipo, color, extra })
+    document.getElementById('mCompLoading').style.display = 'none'
+
+    if (res && res.ok) {
+      comparadorUrls.ml     = res.urlML || ''
+      comparadorUrls.amazon = res.urlAmazon || ''
+
+      document.getElementById('mCompEnlacesBox').style.display   = 'block'
+      document.getElementById('mCompResultadoBox').style.display = 'block'
+      document.getElementById('mCompResumen').textContent       = res.resumen || 'Búsqueda completada.'
+    } else {
+      document.getElementById('mCompResultadoBox').style.display = 'block'
+      document.getElementById('mCompResumen').textContent       = 'Error al realizar la consulta: ' + ((res && res.error) || 'Desconocido')
+    }
+  } catch (err) {
+    document.getElementById('mCompLoading').style.display      = 'none'
+    document.getElementById('mCompResultadoBox').style.display  = 'block'
+    document.getElementById('mCompResumen').textContent        = 'Error de comunicación: ' + err.message
+  } finally {
+    if (btn) btn.disabled = false
+  }
+}
+
+function abrirLinkML () {
+  if (comparadorUrls.ml) api.openExternal(comparadorUrls.ml)
+}
+
+function abrirLinkAmazon () {
+  if (comparadorUrls.amazon) api.openExternal(comparadorUrls.amazon)
+}
+
+// ════════════════════════════════════════════════════════════
 //  IMPRESIONES
 // ════════════════════════════════════════════════════════════
 async function loadImpresiones () {
@@ -1445,7 +1675,109 @@ function cambiarFiltroColor (color) {
 
 function cambiarSortImp (sort) {
   sortActual = sort
+  actualizarIconosHeaderSort()
   renderImpresiones()
+}
+
+function ordenarPorColumna (col) {
+  const mapAscDesc = {
+    'fecha':       { asc: 'fecha_asc', desc: 'fecha_desc' },
+    'descripcion': { asc: 'desc_asc', desc: 'desc_desc' },
+    'material':    { asc: 'material_asc', desc: 'material_desc' },
+    'gramos':      { asc: 'consumo_asc', desc: 'consumo_desc' },
+    'tiempo':      { asc: 'tiempo_asc', desc: 'tiempo_desc' },
+    'categoria':   { asc: 'cat_asc', desc: 'cat_desc' },
+    'costo':       { asc: 'costo_asc', desc: 'costo_desc' }
+  }
+
+  const conf = mapAscDesc[col]
+  if (!conf) return
+
+  // Si ya está ordenado por esta columna, invertir el sentido
+  if (sortActual === conf.desc) {
+    sortActual = conf.asc
+  } else if (sortActual === conf.asc) {
+    sortActual = conf.desc
+  } else {
+    // Para fecha, gramos, tiempo y costo, preferir desc por defecto; para texto, asc
+    sortActual = (col === 'descripcion' || col === 'material' || col === 'categoria') ? conf.asc : conf.desc
+  }
+
+  const sel = document.getElementById('selectSortImp')
+  if (sel) sel.value = sortActual
+  actualizarIconosHeaderSort()
+  renderImpresiones()
+}
+
+function actualizarIconosHeaderSort () {
+  const columnas = ['fecha', 'descripcion', 'material', 'gramos', 'tiempo', 'categoria', 'costo']
+  columnas.forEach(col => {
+    const elIcon = document.getElementById('sortIcon-' + col)
+    const elTh   = elIcon ? elIcon.closest('th') : null
+    if (!elIcon) return
+
+    let activo = false
+    let icon   = '↕'
+
+    if (col === 'fecha' && (sortActual === 'fecha_desc' || sortActual === 'fecha_asc')) {
+      activo = true; icon = sortActual === 'fecha_desc' ? '▼' : '▲'
+    } else if (col === 'descripcion' && (sortActual === 'desc_asc' || sortActual === 'desc_desc')) {
+      activo = true; icon = sortActual === 'desc_desc' ? '▼' : '▲'
+    } else if (col === 'material' && (sortActual === 'material_asc' || sortActual === 'material_desc')) {
+      activo = true; icon = sortActual === 'material_desc' ? '▼' : '▲'
+    } else if (col === 'gramos' && (sortActual === 'consumo_desc' || sortActual === 'consumo_asc')) {
+      activo = true; icon = sortActual === 'consumo_desc' ? '▼' : '▲'
+    } else if (col === 'tiempo' && (sortActual === 'tiempo_desc' || sortActual === 'tiempo_asc')) {
+      activo = true; icon = sortActual === 'tiempo_desc' ? '▼' : '▲'
+    } else if (col === 'categoria' && (sortActual === 'cat_asc' || sortActual === 'cat_desc')) {
+      activo = true; icon = sortActual === 'cat_desc' ? '▼' : '▲'
+    } else if (col === 'costo' && (sortActual === 'costo_desc' || sortActual === 'costo_asc')) {
+      activo = true; icon = sortActual === 'costo_desc' ? '▼' : '▲'
+    }
+
+    elIcon.textContent = icon
+    if (elTh) {
+      elTh.classList.toggle('active', activo)
+    }
+  })
+}
+
+function parseFechaISO (f) {
+  if (!f) return ''
+  const str = String(f).trim()
+  if (str.includes('/')) {
+    const p = str.split('/')
+    if (p.length === 3) {
+      const d = p[0].padStart(2, '0')
+      const m = p[1].padStart(2, '0')
+      const y = p[2]
+      return `${y}-${m}-${d}`
+    }
+  }
+  return str
+}
+
+function parseTiempoSec (t) {
+  if (!t) return 0
+  const s = String(t).trim().toLowerCase()
+  if (!s) return 0
+  let total = 0
+  const hMatch = s.match(/(\d+)\s*(?:h|hr|hrs)/)
+  const mMatch = s.match(/(\d+)\s*(?:m|min|mins)/)
+  const sMatch = s.match(/(\d+)\s*(?:s|seg|segs)/)
+  if (hMatch) total += parseInt(hMatch[1]) * 3600
+  if (mMatch) total += parseInt(mMatch[1]) * 60
+  if (sMatch) total += parseInt(sMatch[1])
+  if (!hMatch && !mMatch && !sMatch) {
+    if (s.includes(':')) {
+      const parts = s.split(':').map(Number)
+      if (parts.length === 3) return (parts[0]*3600) + (parts[1]*60) + parts[2]
+      if (parts.length === 2) return (parts[0]*60) + parts[1]
+    }
+    const soloNum = parseFloat(s)
+    if (!isNaN(soloNum)) return soloNum * 60
+  }
+  return total
 }
 
 function cambiarBusquedaImp (txt) {
@@ -1524,21 +1856,59 @@ function renderImpresiones () {
   // 2. Ordenamiento (Sort)
   const sorted = [...data]
   if (sortActual === 'fecha_desc') {
-    sorted.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.id || b._idx || 0) - (a.id || a._idx || 0)))
+    sorted.sort((a, b) => {
+      const fa = parseFechaISO(a.fecha)
+      const fb = parseFechaISO(b.fecha)
+      if (fa && fb) {
+        const c = fb.localeCompare(fa)
+        if (c !== 0) return c
+      } else if (fb) return 1
+      else if (fa) return -1
+      return ((b.id || b._idx || 0) - (a.id || a._idx || 0))
+    })
   } else if (sortActual === 'fecha_asc') {
-    sorted.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || ((a.id || a._idx || 0) - (b.id || b._idx || 0)))
+    sorted.sort((a, b) => {
+      const fa = parseFechaISO(a.fecha)
+      const fb = parseFechaISO(b.fecha)
+      if (fa && fb) {
+        const c = fa.localeCompare(fb)
+        if (c !== 0) return c
+      } else if (fa) return -1
+      else if (fb) return 1
+      return ((a.id || a._idx || 0) - (b.id || b._idx || 0))
+    })
+  } else if (sortActual === 'desc_asc') {
+    sorted.sort((a, b) => (a.descripcion || '').localeCompare(b.descripcion || '', undefined, { sensitivity: 'base' }) || ((b.id || 0) - (a.id || 0)))
+  } else if (sortActual === 'desc_desc') {
+    sorted.sort((a, b) => (b.descripcion || '').localeCompare(a.descripcion || '', undefined, { sensitivity: 'base' }) || ((b.id || 0) - (a.id || 0)))
   } else if (sortActual === 'material_asc') {
     sorted.sort((a, b) => {
-      const matA = a.materialTipo || (filamentos.find(f => f.nombre === a.filamento) || {}).tipo || 'PLA'
-      const matB = b.materialTipo || (filamentos.find(f => f.nombre === b.filamento) || {}).tipo || 'PLA'
-      return matA.localeCompare(matB) || (a.filamento || '').localeCompare(b.filamento || '') || (b.fecha || '').localeCompare(a.fecha || '')
+      const matA = a.materialTipo || (filamentos.find(f => (f.nombre||'').trim().toLowerCase() === (a.filamento||'').trim().toLowerCase()) || {}).tipo || 'PLA'
+      const matB = b.materialTipo || (filamentos.find(f => (f.nombre||'').trim().toLowerCase() === (b.filamento||'').trim().toLowerCase()) || {}).tipo || 'PLA'
+      return matA.localeCompare(matB) || (a.filamento || '').localeCompare(b.filamento || '') || (parseFechaISO(b.fecha)).localeCompare(parseFechaISO(a.fecha))
     })
-  } else if (sortActual === 'color_asc') {
-    sorted.sort((a, b) => (a.filamento || '').localeCompare(b.filamento || '') || (b.fecha || '').localeCompare(a.fecha || ''))
+  } else if (sortActual === 'material_desc') {
+    sorted.sort((a, b) => {
+      const matA = a.materialTipo || (filamentos.find(f => (f.nombre||'').trim().toLowerCase() === (a.filamento||'').trim().toLowerCase()) || {}).tipo || 'PLA'
+      const matB = b.materialTipo || (filamentos.find(f => (f.nombre||'').trim().toLowerCase() === (b.filamento||'').trim().toLowerCase()) || {}).tipo || 'PLA'
+      return matB.localeCompare(matA) || (b.filamento || '').localeCompare(a.filamento || '') || (parseFechaISO(b.fecha)).localeCompare(parseFechaISO(a.fecha))
+    })
   } else if (sortActual === 'consumo_desc') {
-    sorted.sort((a, b) => (Number(b.gramosUsados) || 0) - (Number(a.gramosUsados) || 0))
+    sorted.sort((a, b) => (Number(b.gramosUsados) || 0) - (Number(a.gramosUsados) || 0) || ((b.id || 0) - (a.id || 0)))
   } else if (sortActual === 'consumo_asc') {
-    sorted.sort((a, b) => (Number(a.gramosUsados) || 0) - (Number(b.gramosUsados) || 0))
+    sorted.sort((a, b) => (Number(a.gramosUsados) || 0) - (Number(b.gramosUsados) || 0) || ((a.id || 0) - (b.id || 0)))
+  } else if (sortActual === 'tiempo_desc') {
+    sorted.sort((a, b) => parseTiempoSec(b.tiempo) - parseTiempoSec(a.tiempo) || ((b.id || 0) - (a.id || 0)))
+  } else if (sortActual === 'tiempo_asc') {
+    sorted.sort((a, b) => parseTiempoSec(a.tiempo) - parseTiempoSec(b.tiempo) || ((a.id || 0) - (b.id || 0)))
+  } else if (sortActual === 'cat_asc') {
+    sorted.sort((a, b) => (a.categoria || '').localeCompare(b.categoria || '') || ((b.id || 0) - (a.id || 0)))
+  } else if (sortActual === 'cat_desc') {
+    sorted.sort((a, b) => (b.categoria || '').localeCompare(a.categoria || '') || ((b.id || 0) - (a.id || 0)))
+  } else if (sortActual === 'costo_desc') {
+    sorted.sort((a, b) => (Number(b.costoMaterial) || 0) - (Number(a.costoMaterial) || 0) || ((b.id || 0) - (a.id || 0)))
+  } else if (sortActual === 'costo_asc') {
+    sorted.sort((a, b) => (Number(a.costoMaterial) || 0) - (Number(b.costoMaterial) || 0) || ((a.id || 0) - (b.id || 0)))
   }
 
   // 3. Sumatoria y métricas del consumo de material
