@@ -394,25 +394,96 @@ tr:hover td{ background:var(--s2); }
       <div class="page-header">
         <div>
           <div class="page-title">Impresiones</div>
-          <div class="page-sub">Registro histórico de todas las impresiones</div>
+          <div class="page-sub">Registro histórico, consumo de material y cotejo con impresora</div>
         </div>
-        <button class="btn btn-primary" onclick="openModalImp()">+ Nueva impresión</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" onclick="abrirModalConCotejoImpresora()" title="Cotejar datos del G-Code activo en Moonraker">⚡ Cotejar con Impresora</button>
+          <button class="btn btn-primary" onclick="openModalImp()">+ Nueva impresión</button>
+        </div>
       </div>
       <div class="page-body">
         <!-- Filtros por categoría -->
-        <div class="filtros" id="filtrosCat">
-          <button class="filtro-btn active" onclick="filtrarCat('Todas')">Todas</button>
-          <button class="filtro-btn" onclick="filtrarCat('Personal')">Personal</button>
-          <button class="filtro-btn" onclick="filtrarCat('Encargo externo')">Encargo externo</button>
-          <button class="filtro-btn" onclick="filtrarCat('Mantenimiento / Repuesto')">Mantenimiento</button>
-          <button class="filtro-btn" onclick="filtrarCat('Prototipo / Prueba')">Prototipo</button>
-          <button class="filtro-btn" onclick="filtrarCat('MONSAN Aretes')">MONSAN Aretes</button>
-          <button class="filtro-btn" onclick="filtrarCat('General')">General</button>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Categoría:</span>
+          <div class="filtros" id="filtrosCat" style="margin-bottom:0;">
+            <button class="filtro-btn active" onclick="filtrarCat('Todas')">Todas</button>
+            <button class="filtro-btn" onclick="filtrarCat('Personal')">Personal</button>
+            <button class="filtro-btn" onclick="filtrarCat('Encargo externo')">Encargo externo</button>
+            <button class="filtro-btn" onclick="filtrarCat('Mantenimiento / Repuesto')">Mantenimiento</button>
+            <button class="filtro-btn" onclick="filtrarCat('Prototipo / Prueba')">Prototipo</button>
+            <button class="filtro-btn" onclick="filtrarCat('MONSAN Aretes')">MONSAN Aretes</button>
+            <button class="filtro-btn" onclick="filtrarCat('General')">General</button>
+          </div>
         </div>
+
+        <!-- Filtros por Tipo de Material -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Material:</span>
+          <div class="filtros" id="filtrosMaterial" style="margin-bottom:0;">
+            <button class="filtro-btn active" data-mat="Todos" onclick="filtrarMaterial('Todos')">Todos</button>
+            <button class="filtro-btn" data-mat="PLA" onclick="filtrarMaterial('PLA')">PLA</button>
+            <button class="filtro-btn" data-mat="PLA+" onclick="filtrarMaterial('PLA+')">PLA+</button>
+            <button class="filtro-btn" data-mat="PETG" onclick="filtrarMaterial('PETG')">PETG</button>
+            <button class="filtro-btn" data-mat="TPU" onclick="filtrarMaterial('TPU')">TPU</button>
+            <button class="filtro-btn" data-mat="Silk" onclick="filtrarMaterial('Silk')">Silk</button>
+            <button class="filtro-btn" data-mat="ASA" onclick="filtrarMaterial('ASA')">ASA</button>
+          </div>
+        </div>
+
+        <!-- Barra de Color, Ordenamiento y Buscador -->
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--s2);padding:8px 12px;border-radius:8px;border:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;color:var(--text2);font-weight:700;">🎨 Color:</span>
+            <select id="selectFiltroColor" onchange="cambiarFiltroColor(this.value)" style="background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:11px;outline:none;">
+              <option value="Todos">Todos los colores / filamentos</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;color:var(--text2);font-weight:700;">⚡ Ordenar por:</span>
+            <select id="selectSortImp" onchange="cambiarSortImp(this.value)" style="background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:11px;outline:none;">
+              <option value="fecha_desc">📅 Fecha (Más reciente)</option>
+              <option value="fecha_asc">📅 Fecha (Más antigua)</option>
+              <option value="material_asc">🏷️ Tipo de Material (A-Z)</option>
+              <option value="color_asc">🎨 Color / Filamento (A-Z)</option>
+              <option value="consumo_desc">⚖️ Consumo Material (Mayor a menor)</option>
+              <option value="consumo_asc">⚖️ Consumo Material (Menor a mayor)</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <input type="text" id="inputBuscarImp" placeholder="🔍 Buscar modelo o filamento..." oninput="cambiarBusquedaImp(this.value)" style="width:100%;background:var(--s1);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text);font-size:11px;outline:none;" />
+          </div>
+        </div>
+
+        <!-- Barra de Estadísticas y Sumatoria de Material -->
+        <div id="impresionesStatsBar" style="background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin:10px 0 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:700;">Impresiones</div>
+              <div id="statImpCount" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:var(--text);margin-top:2px;">0</div>
+            </div>
+            <div style="height:22px;width:1px;background:var(--border);"></div>
+            <div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:700;">Consumo Total Material</div>
+              <div id="statImpGramos" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;color:var(--accent);margin-top:2px;">0 gr</div>
+            </div>
+            <div style="height:22px;width:1px;background:var(--border);"></div>
+            <div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:700;">Costo Material</div>
+              <div id="statImpCosto" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px;color:var(--text);margin-top:2px;">$0.00</div>
+            </div>
+            <div style="height:22px;width:1px;background:var(--border);"></div>
+            <div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:700;">Promedio / Pieza</div>
+              <div id="statImpPromedio" style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:var(--text2);margin-top:2px;">0 gr</div>
+            </div>
+          </div>
+          <div id="statFiltroDetalle" style="font-size:11px;color:var(--text2);background:var(--s2);padding:4px 10px;border-radius:6px;border:1px solid var(--border);">Mostrando: Todas las impresiones</div>
+        </div>
+
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Fecha</th><th>Descripción</th><th>Filamento</th>
+              <th>Fecha</th><th>Descripción</th><th>Material / Color</th>
               <th>Gramos</th><th>Tiempo</th><th>Categoría</th>
               <th>Resultado</th><th>Costo</th><th></th>
             </tr></thead>
@@ -562,9 +633,13 @@ tr:hover td{ background:var(--s2); }
                 <span id="jobNone" style="font-size:10px;color:var(--muted);text-transform:none;font-weight:400;letter-spacing:0;">Sin impresión activa</span>
               </div>
               <div id="jobInfo" style="display:none;">
-                <div style="margin-bottom:10px;">
-                  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px;">Archivo</div>
-                  <div id="jobFilename" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <img id="jobThumbImg" src="" alt="preview" style="width:60px;height:60px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:#1a1a1a;display:none;flex-shrink:0;" />
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:2px;">Archivo G-Code</div>
+                    <div id="jobFilename" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                    <div id="jobFilamentEst" style="font-size:11px;color:var(--text2);margin-top:3px;"></div>
+                  </div>
                 </div>
                 <div class="job-grid">
                   <div class="job-item">
@@ -592,7 +667,7 @@ tr:hover td{ background:var(--s2); }
                     <div class="job-val" id="jobPct" style="color:var(--accent)">—</div>
                   </div>
                 </div>
-                <div style="margin-top:4px;">
+                <div style="margin-top:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
                     <span style="font-size:9px;color:var(--muted)">PROGRESO</span>
                     <span id="jobPctBar" style="font-size:9px;color:var(--accent);font-family:'JetBrains Mono',monospace;">0%</span>
@@ -601,6 +676,9 @@ tr:hover td{ background:var(--s2); }
                     <div class="stock-bar-fill" id="jobProgressBar" style="width:0%;background:var(--accent);"></div>
                   </div>
                 </div>
+                <button class="btn btn-primary btn-sm" onclick="registrarImpresionDesdeImpresora()" style="margin-top:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;">
+                  📋 Registrar este trabajo en Impresiones
+                </button>
               </div>
             </div>
           </div>
@@ -672,6 +750,27 @@ tr:hover td{ background:var(--s2); }
   <div class="modal" style="width:580px">
     <div class="modal-title" id="modalImpTitle">Nueva impresión</div>
     <input type="hidden" id="mImpEditIdx" value=""/>
+
+    <!-- Cotejo con Moonraker -->
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="cotejarGcodeImpresoraModal()" id="btnCotejarModal" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;">
+        ⚡ Cotejar con Impresora (G-Code actual)
+      </button>
+    </div>
+    <div id="gcodeCotejoBox" style="display:none;background:var(--s2);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <img id="gcodeCotejoThumb" src="" alt="preview" style="width:56px;height:56px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:#1a1a1a;flex-shrink:0;" />
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:9px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">G-Code detectado en impresora</div>
+          <div id="gcodeCotejoNombre" style="font-weight:700;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+          <div id="gcodeCotejoDetalles" style="font-size:11px;color:var(--text2);margin-top:2px;"></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" onclick="aplicarDatosCotejoModal()" style="font-size:10px;white-space:nowrap;">
+          Copiar al formulario
+        </button>
+      </div>
+    </div>
+
     <div class="form-grid form-grid-2">
       <div class="field"><label>Fecha</label><input type="date" id="mImpFecha"/></div>
       <div class="field"><label>Categoría</label>
@@ -856,11 +955,15 @@ tr:hover td{ background:var(--s2); }
 // ════════════════════════════════════════════════════════════
 //  ESTADO
 // ════════════════════════════════════════════════════════════
-let cfg          = {}
-let filamentos   = []
-let impresiones  = []
-let filTabActual = 'Todos'
-let catFiltro    = 'Todas'
+let cfg             = {}
+let filamentos      = []
+let impresiones     = []
+let filTabActual    = 'Todos'
+let catFiltro       = 'Todas'
+let materialFiltro  = 'Todos'
+let colorFiltro     = 'Todos'
+let sortActual      = 'fecha_desc'
+let busquedaFiltro  = ''
 
 // ════════════════════════════════════════════════════════════
 //  INIT
@@ -1315,44 +1418,167 @@ async function guardarAjusteStock () {
 // ════════════════════════════════════════════════════════════
 async function loadImpresiones () {
   impresiones = await api.getImpresiones(cfg.rutaExcel)
+  actualizarOpcionesFiltroColor()
   renderImpresiones()
   renderDashboard()
 }
 
 function filtrarCat (cat) {
   catFiltro = cat
-  document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'))
-  event.target.classList.add('active')
+  document.querySelectorAll('#filtrosCat .filtro-btn').forEach(b => b.classList.remove('active'))
+  if (window.event && window.event.target) window.event.target.classList.add('active')
   renderImpresiones()
 }
 
+function filtrarMaterial (mat) {
+  materialFiltro = mat
+  document.querySelectorAll('#filtrosMaterial .filtro-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mat === mat)
+  })
+  renderImpresiones()
+}
+
+function cambiarFiltroColor (color) {
+  colorFiltro = color
+  renderImpresiones()
+}
+
+function cambiarSortImp (sort) {
+  sortActual = sort
+  renderImpresiones()
+}
+
+function cambiarBusquedaImp (txt) {
+  busquedaFiltro = (txt || '').trim().toLowerCase()
+  renderImpresiones()
+}
+
+function actualizarOpcionesFiltroColor () {
+  const sel = document.getElementById('selectFiltroColor')
+  if (!sel) return
+  const valPrevio = sel.value || 'Todos'
+  const setFil = new Set()
+  impresiones.forEach(i => { if (i.filamento) setFil.add(i.filamento) })
+  filamentos.forEach(f => { if (f.nombre) setFil.add(f.nombre) })
+  const lista = Array.from(setFil).sort((a,b) => a.localeCompare(b))
+
+  sel.innerHTML = '<option value="Todos">Todos los colores / filamentos</option>' +
+    lista.map(n => `<option value="${n}">${n}</option>`).join('')
+
+  if (setFil.has(valPrevio)) {
+    sel.value = valPrevio
+  } else {
+    sel.value = 'Todos'
+    colorFiltro = 'Todos'
+  }
+}
+
 function renderImpresiones () {
-  const tb   = document.getElementById('bodyImpresiones')
-  const data = catFiltro === 'Todas' ? impresiones : impresiones.filter(i => i.categoria === catFiltro)
-  const sorted = [...data].reverse()
-  if (!sorted.length) { tb.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px">Sin impresiones</td></tr>'; return }
-  tb.innerHTML = sorted.map(i => {
-    const catColor = {
-      'Personal':'badge-accent', 'Encargo externo':'badge-orange',
-      'Mantenimiento / Repuesto':'badge-warn', 'Prototipo / Prueba':'badge-purple',
-      'MONSAN Aretes':'badge-ok', 'General':'badge-blue'
+  const tb = document.getElementById('bodyImpresiones')
+  if (!tb) return
+
+  // 1. Filtrado
+  const data = impresiones.filter(i => {
+    if (catFiltro !== 'Todas' && i.categoria !== catFiltro) return false
+
+    const fObj = filamentos.find(x => x.nombre === i.filamento) || {}
+    const mTipo = i.materialTipo || fObj.tipo || 'PLA'
+    if (materialFiltro !== 'Todos' && mTipo !== materialFiltro) return false
+
+    if (colorFiltro !== 'Todos' && i.filamento !== colorFiltro) return false
+
+    if (busquedaFiltro) {
+      const desc = (i.descripcion || '').toLowerCase()
+      const fil  = (i.filamento || '').toLowerCase()
+      if (!desc.includes(busquedaFiltro) && !fil.includes(busquedaFiltro)) return false
     }
+    return true
+  })
+
+  // 2. Ordenamiento (Sort)
+  const sorted = [...data]
+  if (sortActual === 'fecha_desc') {
+    sorted.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || ((b.id || b._idx || 0) - (a.id || a._idx || 0)))
+  } else if (sortActual === 'fecha_asc') {
+    sorted.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || ((a.id || a._idx || 0) - (b.id || b._idx || 0)))
+  } else if (sortActual === 'material_asc') {
+    sorted.sort((a, b) => {
+      const matA = a.materialTipo || (filamentos.find(f => f.nombre === a.filamento) || {}).tipo || 'PLA'
+      const matB = b.materialTipo || (filamentos.find(f => f.nombre === b.filamento) || {}).tipo || 'PLA'
+      return matA.localeCompare(matB) || (a.filamento || '').localeCompare(b.filamento || '') || (b.fecha || '').localeCompare(a.fecha || '')
+    })
+  } else if (sortActual === 'color_asc') {
+    sorted.sort((a, b) => (a.filamento || '').localeCompare(b.filamento || '') || (b.fecha || '').localeCompare(a.fecha || ''))
+  } else if (sortActual === 'consumo_desc') {
+    sorted.sort((a, b) => (Number(b.gramosUsados) || 0) - (Number(a.gramosUsados) || 0))
+  } else if (sortActual === 'consumo_asc') {
+    sorted.sort((a, b) => (Number(a.gramosUsados) || 0) - (Number(b.gramosUsados) || 0))
+  }
+
+  // 3. Sumatoria y métricas del consumo de material
+  const totalGramos = sorted.reduce((s, i) => s + (Number(i.gramosUsados) || 0), 0)
+  const totalCosto  = sorted.reduce((s, i) => s + (Number(i.costoMaterial) || 0), 0)
+  const totalItems  = sorted.length
+  const promedioGr  = totalItems > 0 ? (totalGramos / totalItems).toFixed(1) : 0
+  const totalKg     = (totalGramos / 1000).toFixed(2)
+
+  const elCount = document.getElementById('statImpCount')
+  if (elCount) elCount.textContent = `${totalItems} ${totalItems === 1 ? 'impresión' : 'impresiones'}`
+  const elGr = document.getElementById('statImpGramos')
+  if (elGr) elGr.textContent = `${totalGramos.toLocaleString('es-MX', {maximumFractionDigits:1})} gr (${totalKg} kg)`
+  const elCosto = document.getElementById('statImpCosto')
+  if (elCosto) elCosto.textContent = `$${totalCosto.toFixed(2)}`
+  const elProm = document.getElementById('statImpPromedio')
+  if (elProm) elProm.textContent = `${promedioGr} gr`
+
+  const elDetalle = document.getElementById('statFiltroDetalle')
+  if (elDetalle) {
+    const partes = []
+    if (catFiltro !== 'Todas') partes.push(`Cat: ${catFiltro}`)
+    if (materialFiltro !== 'Todos') partes.push(`Material: ${materialFiltro}`)
+    if (colorFiltro !== 'Todos') partes.push(`Color: ${colorFiltro}`)
+    if (busquedaFiltro) partes.push(`"${busquedaFiltro}"`)
+    elDetalle.textContent = partes.length ? `Filtro: ${partes.join(' · ')}` : 'Mostrando: Todo el registro'
+  }
+
+  // 4. Render de la tabla
+  if (!sorted.length) {
+    tb.innerHTML = '<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:28px">Sin impresiones que coincidan con los filtros seleccionados</td></tr>'
+    return
+  }
+
+  const catColor = {
+    'Personal':'badge-accent', 'Encargo externo':'badge-orange',
+    'Mantenimiento / Repuesto':'badge-warn', 'Prototipo / Prueba':'badge-purple',
+    'MONSAN Aretes':'badge-ok', 'General':'badge-blue'
+  }
+
+  tb.innerHTML = sorted.map(i => {
+    const f = filamentos.find(x => x.nombre === i.filamento) || {}
+    const mTipo = i.materialTipo || f.tipo || 'PLA'
     const resColor = i.resultado === 'fail' ? 'badge-error' : i.resultado === 'parcial' ? 'badge-warn' : 'badge-ok'
     const resLabel = i.resultado === 'fail' ? '❌ Fallido' : i.resultado === 'parcial' ? '⚠️ Parcial' : '✅ OK'
+    const swatchStyle = f.colorHex2
+      ? (f.colorHex3
+          ? `background:linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
+          : `background:linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`)
+      : `background:${f.colorHex || i.colorHex || '#888'}`
+
     return `<tr>
-      <td style="color:var(--text2)">${i.fecha||'—'}</td>
-      <td>${i.descripcion||'—'}</td>
-      <td style="color:var(--text2);font-size:11px">
+      <td style="color:var(--text2);font-size:11px;">${i.fecha || '—'}</td>
+      <td><div style="font-weight:600;">${i.descripcion || '—'}</div></td>
+      <td style="font-size:11px">
         <div style="display:flex;align-items:center;gap:6px;">
-          ${(() => { const f = filamentos.find(x => x.nombre === i.filamento); return f ? `<div style="width:8px;height:8px;border-radius:50%;background:${f.colorHex||'#888'};flex-shrink:0;"></div>` : '' })()}
-          ${i.filamento||'—'}
+          <div style="width:10px;height:10px;border-radius:50%;${swatchStyle};flex-shrink:0;border:1px solid var(--border);"></div>
+          <span style="color:var(--text);font-weight:500;">${i.filamento || '—'}</span>
+          <span class="badge badge-accent" style="font-size:8px;padding:1px 5px;">${mTipo}</span>
         </div>
       </td>
-      <td class="td-mono">${i.gramosUsados||0}gr</td>
-      <td style="color:var(--text2)">${i.tiempo||'—'}</td>
-      <td><span class="badge ${catColor[i.categoria]||'badge-accent'}" style="font-size:8px">${i.categoria||'General'}</span></td>
+      <td class="td-mono" style="font-weight:700;color:var(--accent);">${Number(i.gramosUsados || 0).toFixed(1)}gr</td>
+      <td style="color:var(--text2);font-size:11px;">${i.tiempo || '—'}</td>
+      <td><span class="badge ${catColor[i.categoria]||'badge-accent'}" style="font-size:8px">${i.categoria || 'General'}</span></td>
       <td><span class="badge ${resColor}">${resLabel}</span></td>
-      <td class="td-mono">$${(+i.costoMaterial||0).toFixed(2)}</td>
+      <td class="td-mono">$${(+i.costoMaterial || 0).toFixed(2)}</td>
       <td><div class="td-actions">
         <button class="btn btn-secondary btn-sm" onclick="editImpresion(${i._idx})">Editar</button>
         <button class="btn btn-danger btn-sm"    onclick="deleteImpresion(${i._idx})">Borrar</button>
@@ -1380,6 +1606,95 @@ function renderDashboard () {
   </tr>`).join('')
 }
 
+// ════════════════════════════════════════════════════════════
+//  COTEJO CON IMPRESORA (MOONRAKER)
+// ════════════════════════════════════════════════════════════
+async function cotejarGcodeImpresoraModal () {
+  const url = cfg.moonrakerUrl || 'http://192.168.68.113:7125'
+  const btn = document.getElementById('btnCotejarModal')
+  if (btn) btn.textContent = '⏳ Consultando impresora...'
+  try {
+    const res = await api.moonrakerGcodeMetadata(url)
+    if (!res || !res.ok) {
+      alert('No se pudo obtener información del G-Code: ' + (res?.error || 'Verifica que la impresora esté encendida en ' + url))
+      return
+    }
+
+    window._lastGcodeCotejo = res
+    const box   = document.getElementById('gcodeCotejoBox')
+    const thumb = document.getElementById('gcodeCotejoThumb')
+    const nom   = document.getElementById('gcodeCotejoNombre')
+    const det   = document.getElementById('gcodeCotejoDetalles')
+
+    if (box) box.style.display = 'block'
+    if (thumb) {
+      if (res.thumbUrl) {
+        thumb.src = res.thumbUrl
+        thumb.style.display = 'block'
+      } else {
+        thumb.style.display = 'none'
+      }
+    }
+    if (nom) nom.textContent = res.filename || 'Archivo activo'
+
+    const timeMin = Math.round((res.estimatedTimeSec || 0) / 60)
+    const timeFormatted = timeMin >= 60 ? `${Math.floor(timeMin/60)}h ${timeMin%60}m` : `${timeMin}m`
+    const gr = +(res.filamentWeightTotal || 0).toFixed(1)
+
+    if (det) {
+      det.textContent = `Consumo: ${gr}gr · Tiempo aprox: ${timeFormatted} · Slicer: ${res.slicer || 'OrcaSlicer'}`
+    }
+  } catch (err) {
+    alert('Error al conectar con la impresora: ' + err.message)
+  } finally {
+    if (btn) btn.textContent = '⚡ Cotejar con Impresora (G-Code actual)'
+  }
+}
+
+function aplicarDatosCotejoModal () {
+  const data = window._lastGcodeCotejo
+  if (!data) return
+
+  let desc = (data.filename || '').replace(/\.gcode$/i, '')
+  desc = desc.replace(/_[0-9]+[hm][0-9]*[sm]?/gi, '').replace(/_/g, ' ')
+  document.getElementById('mImpDesc').value = desc
+
+  if (data.filamentWeightTotal > 0) {
+    document.getElementById('mImpGr').value = data.filamentWeightTotal.toFixed(1)
+  }
+  if (data.estimatedTimeSec > 0) {
+    const mins = Math.round(data.estimatedTimeSec / 60)
+    document.getElementById('mImpTiempo').value = mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`
+  }
+
+  // Auto-seleccionar filamento sugerido si hay coincidencia
+  const filSelect = document.getElementById('mImpFil')
+  if (filSelect && filamentos.length) {
+    const fnList = Array.isArray(data.filamentName) ? data.filamentName : [data.filamentName].filter(Boolean)
+    let match = null
+    for (const fn of fnList) {
+      match = filamentos.find(f => f.nombre.toLowerCase().includes(String(fn).toLowerCase()))
+      if (match) break
+    }
+    if (!match && data.filamentType) {
+      const ft = (Array.isArray(data.filamentType) ? data.filamentType[0] : data.filamentType).toLowerCase()
+      match = filamentos.find(f => (f.tipo || '').toLowerCase() === ft)
+    }
+    if (match) filSelect.value = match.nombre
+  }
+}
+
+async function abrirModalConCotejoImpresora () {
+  openModalImp()
+  await cotejarGcodeImpresoraModal()
+  aplicarDatosCotejoModal()
+}
+
+async function registrarImpresionDesdeImpresora () {
+  showPage('impresiones')
+  await abrirModalConCotejoImpresora()
+}
+
 function openModalImp () {
   document.getElementById('modalImpTitle').textContent = 'Nueva impresión'
   document.getElementById('mImpEditIdx').value = ''
@@ -1391,6 +1706,12 @@ function openModalImp () {
   document.getElementById('mImpCat').value     = 'Personal'
   document.getElementById('mImpResultado').value      = ''
   document.getElementById('mImpTipoImpresion').value  = ''
+
+  // Ocultar caja de cotejo al abrir nuevo
+  const box = document.getElementById('gcodeCotejoBox')
+  if (box) box.style.display = 'none'
+  window._lastGcodeCotejo = null
+
   openModal('modalImp')
 }
 
@@ -1410,6 +1731,11 @@ function editImpresion (idx) {
   document.getElementById('mImpCat').value       = i.categoria   || 'General'
   document.getElementById('mImpResultado').value     = i.resultado      || ''
   document.getElementById('mImpTipoImpresion').value = i.tipoImpresion  || ''
+
+  // Ocultar cotejo en edición
+  const box = document.getElementById('gcodeCotejoBox')
+  if (box) box.style.display = 'none'
+
   openModal('modalImp')
 }
 

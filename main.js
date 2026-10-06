@@ -216,11 +216,16 @@ function sincronizarFilamentoAInventario (nombre, stockGr, costoKg, colorHex) {
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('get-impresiones', () => {
   return db.prepare(`
-    SELECT id as _idx, id, fecha, descripcion, filamento,
-           gramos_usados as gramosUsados, tiempo, categoria,
-           resultado, costo_material as costoMaterial,
-           tipo_impresion as tipoImpresion
-    FROM impresiones ORDER BY rowid
+    SELECT i.id as _idx, i.id, i.fecha, i.descripcion, i.filamento,
+           i.gramos_usados as gramosUsados, i.tiempo, i.categoria,
+           i.resultado, i.costo_material as costoMaterial,
+           i.tipo_impresion as tipoImpresion,
+           COALESCE(f.tipo, 'PLA') as materialTipo,
+           COALESCE(f.color_hex, '#888888') as colorHex,
+           COALESCE(f.marca, '') as materialMarca
+    FROM impresiones i
+    LEFT JOIN filamentos f ON i.filamento = f.nombre
+    ORDER BY i.rowid
   `).all()
 })
 
@@ -410,6 +415,38 @@ ipcMain.handle('moonraker-status', async (_, baseUrl) => {
   }
 })
 
+async function getGcodeMetadataHelper (baseUrl, filename) {
+  if (!baseUrl || !filename) return null
+  try {
+    const metaRes = await moonrakerGet(baseUrl, `/server/files/metadata?filename=${encodeURIComponent(filename)}`)
+    const meta = metaRes?.result || {}
+    let thumbUrl = null
+    if (meta.thumbnails && meta.thumbnails.length > 0) {
+      const sortedThumbs = [...meta.thumbnails].sort((a, b) => (b.width * b.height) - (a.width * a.height))
+      const thumb = sortedThumbs[0]
+      if (thumb && thumb.relative_path) {
+        thumbUrl = `${baseUrl}/server/files/gcodes/${thumb.relative_path}`
+      }
+    }
+    return {
+      filename,
+      thumbUrl,
+      estimatedTimeSec: meta.estimated_time || 0,
+      filamentWeightTotal: +(meta.filament_weight_total || 0),
+      filamentTotalMm: +(meta.filament_total || 0),
+      filamentName: meta.filament_name || '',
+      filamentType: meta.filament_type || '',
+      filamentColors: meta.filament_colors || [],
+      slicer: meta.slicer || '',
+      slicerVersion: meta.slicer_version || '',
+      layerHeight: meta.layer_height || 0,
+      layerCount: meta.layer_count || 0
+    }
+  } catch {
+    return null
+  }
+}
+
 ipcMain.handle('moonraker-job', async (_, baseUrl) => {
   try {
     const [displayStatus, printStats] = await Promise.all([
@@ -426,6 +463,12 @@ ipcMain.handle('moonraker-job', async (_, baseUrl) => {
     let remainSec = 0
     if (progress > 0 && progress < 1 && printedSec > 0)
       remainSec = Math.max(0, (printedSec / progress) - printedSec)
+
+    let metaInfo = null
+    if (filename) {
+      metaInfo = await getGcodeMetadataHelper(baseUrl, filename)
+    }
+
     return {
       online: true, state, filename,
       objectName:   filename.replace(/\.[^.]+$/, ''),
@@ -434,12 +477,40 @@ ipcMain.handle('moonraker-job', async (_, baseUrl) => {
       totalSec:     Math.round(totalSec),
       remainSec:    Math.round(remainSec),
       currentLayer: ps.info?.current_layer || 0,
-      totalLayers:  ps.info?.total_layer   || 0
+      totalLayers:  ps.info?.total_layer   || 0,
+      thumbUrl:     metaInfo?.thumbUrl || null,
+      filamentWeightTotal: metaInfo?.filamentWeightTotal || 0,
+      filamentType: metaInfo?.filamentType || '',
+      estimatedTimeSec: metaInfo?.estimatedTimeSec || 0
     }
   } catch {
     return { online:false, state:'standby', filename:'', objectName:'',
              progress:0, printedSec:0, totalSec:0, remainSec:0,
-             currentLayer:0, totalLayers:0 }
+             currentLayer:0, totalLayers:0, thumbUrl:null, filamentWeightTotal:0 }
+  }
+})
+
+ipcMain.handle('moonraker-gcode-metadata', async (_, baseUrl, specifiedFilename) => {
+  try {
+    let filename = specifiedFilename
+    if (!filename) {
+      const psRes = await moonrakerGet(baseUrl, '/printer/objects/query?print_stats=filename')
+      filename = psRes?.result?.status?.print_stats?.filename
+    }
+    if (!filename) {
+      const listRes = await moonrakerGet(baseUrl, '/server/files/list?root=gcodes')
+      const files = listRes?.result || []
+      if (files.length > 0) {
+        files.sort((a, b) => (b.modified || 0) - (a.modified || 0))
+        filename = files[0].path || files[0].filename
+      }
+    }
+    if (!filename) return { ok: false, error: 'No hay archivos G-Code en la impresora' }
+    const meta = await getGcodeMetadataHelper(baseUrl, filename)
+    if (!meta) return { ok: false, error: 'No se pudieron leer los metadatos del G-Code' }
+    return { ok: true, ...meta }
+  } catch (err) {
+    return { ok: false, error: err.message }
   }
 })
 
