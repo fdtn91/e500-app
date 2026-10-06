@@ -1457,16 +1457,39 @@ function actualizarOpcionesFiltroColor () {
   const sel = document.getElementById('selectFiltroColor')
   if (!sel) return
   const valPrevio = sel.value || 'Todos'
-  const setFil = new Set()
-  impresiones.forEach(i => { if (i.filamento) setFil.add(i.filamento) })
-  filamentos.forEach(f => { if (f.nombre) setFil.add(f.nombre) })
-  const lista = Array.from(setFil).sort((a,b) => a.localeCompare(b))
+
+  // Map canónico de nombres (insensible a mayúsculas/minúsculas)
+  const mapCanonico = new Map()
+
+  // 1. Priorizar nombres canónicos oficiales de la tabla de filamentos
+  filamentos.forEach(f => {
+    if (f.nombre && f.nombre.trim()) {
+      const canon = f.nombre.trim()
+      mapCanonico.set(canon.toLowerCase(), canon)
+    }
+  })
+
+  // 2. Agregar cualquier filamento registrado en impresiones
+  impresiones.forEach(i => {
+    if (i.filamento && i.filamento.trim()) {
+      const nom = i.filamento.trim()
+      const key = nom.toLowerCase()
+      if (!mapCanonico.has(key)) {
+        mapCanonico.set(key, nom)
+      }
+    }
+  })
+
+  const lista = Array.from(mapCanonico.values()).sort((a,b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 
   sel.innerHTML = '<option value="Todos">Todos los colores / filamentos</option>' +
     lista.map(n => `<option value="${n}">${n}</option>`).join('')
 
-  if (setFil.has(valPrevio)) {
-    sel.value = valPrevio
+  // Restaurar selección previa si aún existe
+  const coincidencia = lista.find(n => n.toLowerCase() === valPrevio.toLowerCase())
+  if (valPrevio !== 'Todos' && coincidencia) {
+    sel.value = coincidencia
+    colorFiltro = coincidencia
   } else {
     sel.value = 'Todos'
     colorFiltro = 'Todos'
@@ -1481,11 +1504,14 @@ function renderImpresiones () {
   const data = impresiones.filter(i => {
     if (catFiltro !== 'Todas' && i.categoria !== catFiltro) return false
 
-    const fObj = filamentos.find(x => x.nombre === i.filamento) || {}
+    const filNameNorm = (i.filamento || '').trim().toLowerCase()
+    const fObj = filamentos.find(x => (x.nombre || '').trim().toLowerCase() === filNameNorm) || {}
     const mTipo = i.materialTipo || fObj.tipo || 'PLA'
     if (materialFiltro !== 'Todos' && mTipo !== materialFiltro) return false
 
-    if (colorFiltro !== 'Todos' && i.filamento !== colorFiltro) return false
+    if (colorFiltro !== 'Todos') {
+      if (filNameNorm !== colorFiltro.trim().toLowerCase()) return false
+    }
 
     if (busquedaFiltro) {
       const desc = (i.descripcion || '').toLowerCase()
@@ -1554,7 +1580,8 @@ function renderImpresiones () {
   }
 
   tb.innerHTML = sorted.map(i => {
-    const f = filamentos.find(x => x.nombre === i.filamento) || {}
+    const filNameNorm = (i.filamento || '').trim().toLowerCase()
+    const f = filamentos.find(x => (x.nombre || '').trim().toLowerCase() === filNameNorm) || {}
     const mTipo = i.materialTipo || f.tipo || 'PLA'
     const resColor = i.resultado === 'fail' ? 'badge-error' : i.resultado === 'parcial' ? 'badge-warn' : 'badge-ok'
     const resLabel = i.resultado === 'fail' ? '❌ Fallido' : i.resultado === 'parcial' ? '⚠️ Parcial' : '✅ OK'

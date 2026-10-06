@@ -224,17 +224,26 @@ ipcMain.handle('get-impresiones', () => {
            COALESCE(f.color_hex, '#888888') as colorHex,
            COALESCE(f.marca, '') as materialMarca
     FROM impresiones i
-    LEFT JOIN filamentos f ON i.filamento = f.nombre
+    LEFT JOIN filamentos f ON TRIM(i.filamento) = TRIM(f.nombre) COLLATE NOCASE
     ORDER BY i.rowid
   `).all()
 })
 
 ipcMain.handle('save-impresion', (_, __, imp) => {
+  // Encontrar nombre canónico del filamento si existe
+  let filamentoNombre = (imp.filamento || '').trim()
+  if (filamentoNombre) {
+    const matchedFil = db.prepare('SELECT nombre FROM filamentos WHERE TRIM(nombre) = ? COLLATE NOCASE').get(filamentoNombre)
+    if (matchedFil && matchedFil.nombre) {
+      filamentoNombre = matchedFil.nombre
+    }
+  }
+
   // Calcular costo de material
   let costoMat = imp.costoMaterial || 0
   let costoKgFil = 0
-  if (!costoMat && imp.gramosUsados && imp.filamento) {
-    const fil = db.prepare('SELECT costo_kg FROM filamentos WHERE nombre=?').get(imp.filamento)
+  if (!costoMat && imp.gramosUsados && filamentoNombre) {
+    const fil = db.prepare('SELECT costo_kg FROM filamentos WHERE TRIM(nombre)=? COLLATE NOCASE').get(filamentoNombre)
     if (fil) {
       costoKgFil = fil.costo_kg || 0
       costoMat   = +((imp.gramosUsados / 1000) * costoKgFil).toFixed(2)
@@ -253,12 +262,12 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
     if (anterior) {
       const targetId = anterior.id
       const diferencia = (imp.gramosUsados || 0) - (anterior.gramos_usados || 0)
-      if (diferencia !== 0 && imp.filamento) {
-        const fil = db.prepare('SELECT stock_gr FROM filamentos WHERE nombre=?').get(imp.filamento)
+      if (diferencia !== 0 && filamentoNombre) {
+        const fil = db.prepare('SELECT stock_gr FROM filamentos WHERE TRIM(nombre)=? COLLATE NOCASE').get(filamentoNombre)
         if (fil) {
           nuevoStock = Math.max(0, (fil.stock_gr || 0) - diferencia)
-          db.prepare(`UPDATE filamentos SET stock_gr=?, updated_at=datetime('now','localtime') WHERE nombre=?`)
-            .run(nuevoStock, imp.filamento)
+          db.prepare(`UPDATE filamentos SET stock_gr=?, updated_at=datetime('now','localtime') WHERE TRIM(nombre)=? COLLATE NOCASE`)
+            .run(nuevoStock, filamentoNombre)
         }
       }
       db.prepare(`
@@ -266,18 +275,18 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
           fecha=?, descripcion=?, filamento=?, gramos_usados=?, tiempo=?,
           categoria=?, resultado=?, costo_material=?, tipo_impresion=?
         WHERE id=?
-      `).run(imp.fecha, imp.descripcion, imp.filamento, imp.gramosUsados||0,
+      `).run(imp.fecha, imp.descripcion, filamentoNombre, imp.gramosUsados||0,
              imp.tiempo||'', imp.categoria||'General', imp.resultado||'',
              costoMat, imp.tipoImpresion||'', targetId)
     }
   } else {
     // Nueva impresión — descontar stock
-    if (imp.filamento && imp.gramosUsados) {
-      const fil = db.prepare('SELECT stock_gr FROM filamentos WHERE nombre=?').get(imp.filamento)
+    if (filamentoNombre && imp.gramosUsados) {
+      const fil = db.prepare('SELECT stock_gr FROM filamentos WHERE TRIM(nombre)=? COLLATE NOCASE').get(filamentoNombre)
       if (fil) {
         nuevoStock = Math.max(0, (fil.stock_gr || 0) - (imp.gramosUsados || 0))
-        db.prepare(`UPDATE filamentos SET stock_gr=?, updated_at=datetime('now','localtime') WHERE nombre=?`)
-          .run(nuevoStock, imp.filamento)
+        db.prepare(`UPDATE filamentos SET stock_gr=?, updated_at=datetime('now','localtime') WHERE TRIM(nombre)=? COLLATE NOCASE`)
+          .run(nuevoStock, filamentoNombre)
       }
     }
     db.prepare(`
@@ -285,7 +294,7 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
         (fecha, descripcion, filamento, gramos_usados, tiempo,
          categoria, resultado, costo_material, tipo_impresion)
       VALUES (?,?,?,?,?,?,?,?,?)
-    `).run(imp.fecha, imp.descripcion, imp.filamento, imp.gramosUsados||0,
+    `).run(imp.fecha, imp.descripcion, filamentoNombre, imp.gramosUsados||0,
            imp.tiempo||'', imp.categoria||'General', imp.resultado||'',
            costoMat, imp.tipoImpresion||'')
   }
@@ -294,7 +303,7 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
     ok:           true,
     stockBajo:    nuevoStock !== null && nuevoStock < STOCK_MINIMO,
     stockRestante: nuevoStock,
-    filamento:    imp.filamento
+    filamento:    filamentoNombre
   }
 })
 
