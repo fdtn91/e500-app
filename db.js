@@ -114,12 +114,25 @@ function initSchema (db) {
       created_at       TEXT    DEFAULT (datetime('now','localtime'))
     );
 
+    -- ── Ajustes manuales de stock ───────────────────────────
+    CREATE TABLE IF NOT EXISTS ajustes_stock (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      filamento_id     INTEGER,
+      filamento_nombre TEXT    NOT NULL,
+      stock_anterior   REAL    NOT NULL,
+      stock_nuevo      REAL    NOT NULL,
+      diferencia_gr    REAL    NOT NULL,
+      razon_ajuste     TEXT    NOT NULL,
+      created_at       TEXT    DEFAULT (datetime('now','localtime'))
+    );
+
     -- ── Índices ─────────────────────────────────────────────
     CREATE INDEX IF NOT EXISTS idx_imp_fecha     ON impresiones (fecha);
     CREATE INDEX IF NOT EXISTS idx_imp_filamento ON impresiones (filamento);
     CREATE INDEX IF NOT EXISTS idx_inv_sku       ON inventario  (sku);
     CREATE INDEX IF NOT EXISTS idx_cli_tipo      ON clientes    (tipo);
     CREATE INDEX IF NOT EXISTS idx_cos_sku       ON costos      (sku);
+    CREATE INDEX IF NOT EXISTS idx_ajustes_fil   ON ajustes_stock (filamento_nombre);
   `)
 }
 

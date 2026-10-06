@@ -807,6 +807,51 @@ tr:hover td{ background:var(--s2); }
   </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     MODAL: AJUSTAR STOCK DE MATERIAL
+══════════════════════════════════════ -->
+<div class="modal-backdrop" id="modalAjusteStock">
+  <div class="modal" style="width:500px">
+    <div class="modal-title" id="modalAjusteStockTitle">Ajustar stock de material</div>
+    <input type="hidden" id="mAjusteFilIdx" value=""/>
+
+    <div style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
+      <div id="mAjusteSwatch" style="width:34px;height:34px;border-radius:6px;border:1px solid var(--border);flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div id="mAjusteNombre" style="font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        <div id="mAjusteMeta" style="font-size:11px;color:var(--text2);margin-top:2px;">—</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;">Stock actual</div>
+        <div id="mAjusteStockActual" style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--accent);">0 gr</div>
+      </div>
+    </div>
+
+    <div class="form-grid form-grid-2" style="margin-bottom:14px;">
+      <div class="field">
+        <label>Nuevo stock (gramos)</label>
+        <input type="number" id="mAjusteNuevoStock" step="1" min="0" placeholder="Ej: 850" oninput="calcularDiferenciaAjuste()"/>
+      </div>
+      <div class="field">
+        <label>Diferencia calculada</label>
+        <div id="mAjusteDif" style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:8px 12px;background:var(--s2);border:1px solid var(--border);border-radius:6px;color:var(--text2);display:flex;align-items:center;height:38px;">
+          0 gr
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:14px;">
+      <label style="font-weight:600;">Razón de ajuste</label>
+      <input type="text" id="mAjusteRazon" placeholder="Ej: Pesaje físico de bobina, corrección por merma, cambio de carrete..." />
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalAjusteStock')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarAjusteStock()">Guardar ajuste</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════════════════
 //  ESTADO
@@ -1011,16 +1056,19 @@ function renderFilamentos () {
           <span class="badge badge-accent" style="font-size:9px;">${f.tipo}</span>
           <span>$${(+f.costoKg||0).toFixed(0)}/kg</span>
         </div>
-        <div class="fil-card-stock-bar">
+        <div class="fil-card-stock-bar" style="cursor:pointer;" title="Click para ajustar stock" onclick="abrirAjusteStock(${f._idx})">
           <div class="fil-card-stock-fill" style="width:${pct}%;background:${color}"></div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;">
-          <span class="badge ${badge}" style="font-size:9px;">${f.stockGr}gr</span>
+          <span class="badge ${badge}" style="font-size:9px;cursor:pointer;" title="Click para ajustar stock" onclick="abrirAjusteStock(${f._idx})">${f.stockGr}gr</span>
           <span style="color:${color};font-family:monospace;font-weight:700;">${pct}%</span>
         </div>
-        <div class="fil-card-actions">
-          <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;" onclick="editFilamento(${f._idx})">Editar</button>
-          <button class="btn btn-danger btn-sm" style="font-size:10px;" onclick="deleteFilamento('${f.nombre}')">✕</button>
+        <div class="fil-card-actions" style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
+          <button class="btn btn-primary btn-sm" style="width:100%;font-size:10px;padding:4px 6px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})">⚖️ Ajustar Stock</button>
+          <div style="display:flex;gap:4px;width:100%;">
+            <button class="btn btn-secondary btn-sm" style="flex:1;font-size:10px;padding:3px 4px;" onclick="editFilamento(${f._idx})">Editar</button>
+            <button class="btn btn-danger btn-sm" style="font-size:10px;padding:3px 6px;" onclick="deleteFilamento('${f.nombre}')">✕</button>
+          </div>
         </div>
       </div>
     </div>`
@@ -1061,6 +1109,7 @@ function renderDashboardFilamentos () {
       <div class="stock-bar" style="flex:1"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);width:80px;text-align:right">${f.stockGr}gr / ${f.pesoBobina}gr</div>
       <div style="font-size:10px;color:${color};font-family:'JetBrains Mono',monospace;width:34px;text-align:right">${pct}%</div>
+      <button class="btn btn-secondary btn-sm" style="font-size:9px;padding:2px 6px;margin-left:4px;" onclick="abrirAjusteStock(${f._idx})" title="Ajustar stock">⚖️</button>
     </div>`
   }).join('')
 }
@@ -1170,6 +1219,98 @@ async function deleteFilamento (nombre) {
 }
 
 // ════════════════════════════════════════════════════════════
+//  AJUSTE MANUAL DE STOCK
+// ════════════════════════════════════════════════════════════
+function abrirAjusteStock (idx) {
+  const f = filamentos.find(x => x._idx === idx || x.id === idx) || filamentos[idx]
+  if (!f) return
+  document.getElementById('mAjusteFilIdx').value = f._idx !== undefined ? f._idx : f.id
+  document.getElementById('mAjusteNombre').textContent = f.nombre
+  document.getElementById('mAjusteMeta').textContent = `${f.tipo} · ${f.marca || 'Sin marca'}`
+  document.getElementById('mAjusteStockActual').textContent = `${f.stockGr} gr`
+  document.getElementById('mAjusteStockActual').dataset.raw = f.stockGr
+  document.getElementById('mAjusteNuevoStock').value = f.stockGr
+  document.getElementById('mAjusteRazon').value = ''
+
+  const swatch = document.getElementById('mAjusteSwatch')
+  if (f.colorHex2) {
+    swatch.style.background = f.colorHex3
+      ? `linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
+      : `linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`
+  } else {
+    swatch.style.background = f.colorHex || '#888'
+  }
+
+  calcularDiferenciaAjuste()
+  openModal('modalAjusteStock')
+  setTimeout(() => {
+    const input = document.getElementById('mAjusteNuevoStock')
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  }, 100)
+}
+
+function calcularDiferenciaAjuste () {
+  const stockActual = parseFloat(document.getElementById('mAjusteStockActual').dataset.raw || 0)
+  const nuevoVal = parseFloat(document.getElementById('mAjusteNuevoStock').value)
+  const difEl = document.getElementById('mAjusteDif')
+  if (isNaN(nuevoVal)) {
+    difEl.textContent = '—'
+    difEl.style.color = 'var(--text2)'
+    return
+  }
+  const dif = nuevoVal - stockActual
+  if (dif > 0) {
+    difEl.textContent = `+${dif.toFixed(1)} gr`
+    difEl.style.color = 'var(--ok)'
+  } else if (dif < 0) {
+    difEl.textContent = `${dif.toFixed(1)} gr`
+    difEl.style.color = 'var(--error)'
+  } else {
+    difEl.textContent = 'Sin cambio (0 gr)'
+    difEl.style.color = 'var(--text2)'
+  }
+}
+
+async function guardarAjusteStock () {
+  const idx = document.getElementById('mAjusteFilIdx').value
+  const f = filamentos.find(x => String(x._idx) === String(idx) || String(x.id) === String(idx))
+  if (!f) { alert('Material no encontrado'); return }
+
+  const nuevoStock = parseFloat(document.getElementById('mAjusteNuevoStock').value)
+  if (isNaN(nuevoStock) || nuevoStock < 0) {
+    alert('Por favor ingresa un gramaje válido (mayor o igual a 0).')
+    document.getElementById('mAjusteNuevoStock').focus()
+    return
+  }
+
+  const razon = document.getElementById('mAjusteRazon').value.trim()
+  if (!razon) {
+    alert('Por favor ingresa la "Razón de ajuste".')
+    document.getElementById('mAjusteRazon').focus()
+    return
+  }
+
+  const res = await api.ajustarStock(cfg.rutaExcel, {
+    id: f._idx !== undefined ? f._idx : f.id,
+    nombre: f.nombre,
+    nuevoStock: nuevoStock,
+    razon: razon
+  })
+
+  if (res && res.ok) {
+    closeModal('modalAjusteStock')
+    await loadFilamentos()
+    populateFilSelect()
+    await checkAlertasStock()
+  } else {
+    alert('Error al actualizar el stock: ' + ((res && res.error) || 'Desconocido'))
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 //  IMPRESIONES
 // ════════════════════════════════════════════════════════════
 async function loadImpresiones () {
@@ -1254,9 +1395,13 @@ function openModalImp () {
 }
 
 function editImpresion (idx) {
-  const i = impresiones[idx]
+  const i = impresiones.find(x => x._idx === idx || x.id === idx) || impresiones[idx]
+  if (!i) {
+    console.warn('No se encontró la impresión a editar con id:', idx)
+    return
+  }
   document.getElementById('modalImpTitle').textContent = 'Editar impresión'
-  document.getElementById('mImpEditIdx').value   = idx
+  document.getElementById('mImpEditIdx').value   = i._idx !== undefined ? i._idx : (i.id !== undefined ? i.id : idx)
   document.getElementById('mImpFecha').value     = i.fecha   || ''
   document.getElementById('mImpDesc').value      = i.descripcion || ''
   document.getElementById('mImpFil').value       = i.filamento   || ''
@@ -1304,6 +1449,7 @@ async function deleteImpresion (idx) {
   if (!confirm('¿Eliminar esta impresión?')) return
   await api.deleteImpresion(cfg.rutaExcel, idx)
   await loadImpresiones()
+  await loadFilamentos()
 }
 
 // ════════════════════════════════════════════════════════════

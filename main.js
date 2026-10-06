@@ -158,6 +158,45 @@ ipcMain.handle('get-alertas-stock', () => {
   `).all(STOCK_MINIMO)
 })
 
+ipcMain.handle('ajustar-stock', (_, __, data) => {
+  const { id, nombre, nuevoStock, razon } = data || {}
+  const fil = (id !== undefined && id !== null && id !== '')
+    ? db.prepare('SELECT id, nombre, stock_gr, costo_kg, color_hex FROM filamentos WHERE id=?').get(id)
+    : db.prepare('SELECT id, nombre, stock_gr, costo_kg, color_hex FROM filamentos WHERE nombre=?').get(nombre)
+  if (!fil) return { ok: false, error: 'Material no encontrado' }
+
+  const stockAnterior = +(fil.stock_gr || 0)
+  const stockNuevo    = Math.max(0, +(nuevoStock || 0))
+  const dif           = +(stockNuevo - stockAnterior).toFixed(2)
+  const razonTexto    = String(razon || '').trim() || 'Ajuste manual'
+
+  db.prepare(`
+    UPDATE filamentos SET
+      stock_gr=?,
+      updated_at=datetime('now','localtime')
+    WHERE id=?
+  `).run(stockNuevo, fil.id)
+
+  try {
+    db.prepare(`
+      INSERT INTO ajustes_stock (filamento_id, filamento_nombre, stock_anterior, stock_nuevo, diferencia_gr, razon_ajuste)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(fil.id, fil.nombre, stockAnterior, stockNuevo, dif, razonTexto)
+  } catch (err) {
+    console.error('Error al guardar ajuste_stock:', err)
+  }
+
+  sincronizarFilamentoAInventario(fil.nombre, stockNuevo, fil.costo_kg, fil.color_hex)
+
+  return {
+    ok: true,
+    stockAnterior,
+    stockNuevo,
+    diferencia: dif,
+    stockBajo: stockNuevo < STOCK_MINIMO
+  }
+})
+
 // ════════════════════════════════════════════════════════════
 //  SINCRONIZACIÓN AUTOMÁTICA FILAMENTO → MONSAM
 //  Actualiza stock en la tabla filamentos (que monsam también lee)
@@ -177,7 +216,7 @@ function sincronizarFilamentoAInventario (nombre, stockGr, costoKg, colorHex) {
 // ════════════════════════════════════════════════════════════
 ipcMain.handle('get-impresiones', () => {
   return db.prepare(`
-    SELECT id as _idx, fecha, descripcion, filamento,
+    SELECT id as _idx, id, fecha, descripcion, filamento,
            gramos_usados as gramosUsados, tiempo, categoria,
            resultado, costo_material as costoMaterial,
            tipo_impresion as tipoImpresion
@@ -199,11 +238,15 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
 
   let nuevoStock = null
 
-  if (imp._editIndex !== undefined) {
+  if (imp._editIndex !== undefined && imp._editIndex !== null && imp._editIndex !== '') {
     // Obtener impresión anterior para calcular diferencia de gramos
-    const anterior = db.prepare('SELECT gramos_usados, filamento FROM impresiones ORDER BY rowid LIMIT 1 OFFSET ?')
-                       .get(imp._editIndex)
+    const editId = imp._editIndex
+    let anterior = db.prepare('SELECT id, gramos_usados, filamento FROM impresiones WHERE id=?').get(editId)
+    if (!anterior) {
+      anterior = db.prepare('SELECT id, gramos_usados, filamento FROM impresiones ORDER BY rowid LIMIT 1 OFFSET ?').get(editId)
+    }
     if (anterior) {
+      const targetId = anterior.id
       const diferencia = (imp.gramosUsados || 0) - (anterior.gramos_usados || 0)
       if (diferencia !== 0 && imp.filamento) {
         const fil = db.prepare('SELECT stock_gr FROM filamentos WHERE nombre=?').get(imp.filamento)
@@ -217,10 +260,10 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
         UPDATE impresiones SET
           fecha=?, descripcion=?, filamento=?, gramos_usados=?, tiempo=?,
           categoria=?, resultado=?, costo_material=?, tipo_impresion=?
-        WHERE rowid = (SELECT rowid FROM impresiones ORDER BY rowid LIMIT 1 OFFSET ?)
+        WHERE id=?
       `).run(imp.fecha, imp.descripcion, imp.filamento, imp.gramosUsados||0,
              imp.tiempo||'', imp.categoria||'General', imp.resultado||'',
-             costoMat, imp.tipoImpresion||'', imp._editIndex)
+             costoMat, imp.tipoImpresion||'', targetId)
     }
   } else {
     // Nueva impresión — descontar stock
@@ -250,16 +293,18 @@ ipcMain.handle('save-impresion', (_, __, imp) => {
   }
 })
 
-ipcMain.handle('delete-impresion', (_, __, rowIndex) => {
-  const row = db.prepare('SELECT rowid, filamento, gramos_usados FROM impresiones ORDER BY rowid LIMIT 1 OFFSET ?')
-                .get(rowIndex)
+ipcMain.handle('delete-impresion', (_, __, idOrIndex) => {
+  let row = db.prepare('SELECT id, filamento, gramos_usados FROM impresiones WHERE id=?').get(idOrIndex)
+  if (!row) {
+    row = db.prepare('SELECT id, filamento, gramos_usados FROM impresiones ORDER BY rowid LIMIT 1 OFFSET ?').get(idOrIndex)
+  }
   if (!row) return false
   // Restaurar stock al eliminar impresión
   if (row.filamento && row.gramos_usados) {
     db.prepare(`UPDATE filamentos SET stock_gr = stock_gr + ?, updated_at=datetime('now','localtime') WHERE nombre=?`)
       .run(row.gramos_usados, row.filamento)
   }
-  db.prepare('DELETE FROM impresiones WHERE rowid=?').run(row.rowid)
+  db.prepare('DELETE FROM impresiones WHERE id=?').run(row.id)
   return true
 })
 
