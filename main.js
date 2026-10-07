@@ -52,10 +52,42 @@ function initDB () {
 }
 
 // ════════════════════════════════════════════════════════════
-//  VENTANA
+//  VENTANAS (SPLASH & PRINCIPAL)
 // ════════════════════════════════════════════════════════════
+let splashWin = null
+let mainWin   = null
+
+function createSplashWindow () {
+  splashWin = new BrowserWindow({
+    width: 460,
+    height: 280,
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
+    alwaysOnTop: true,
+    resizable: false,
+    center: true,
+    show: false,
+    icon: path.join(__dirname, 'icono.ico'),
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  })
+
+  splashWin.loadFile('splash.html')
+  splashWin.once('ready-to-show', () => {
+    if (splashWin && !splashWin.isDestroyed()) {
+      splashWin.show()
+    }
+  })
+  splashWin.on('closed', () => {
+    splashWin = null
+  })
+}
+
 function createWindow () {
-  const win = new BrowserWindow({
+  mainWin = new BrowserWindow({
     width: 1200, height: 760,
     minWidth: 960, minHeight: 640,
     frame: false,
@@ -69,14 +101,77 @@ function createWindow () {
       webSecurity: false
     }
   })
-  win.loadFile('index.html')
-  win.once('ready-to-show', () => win.show())
+
+  mainWin.loadFile('index.html')
+
+  mainWin.webContents.on('did-fail-load', (_, errorCode, errorDescription) => {
+    if (splashWin && !splashWin.isDestroyed()) {
+      splashWin.webContents.send('splash-error', `Error al cargar la interfaz gráfica: ${errorDescription} (Código: ${errorCode})`)
+    }
+  })
+
+  const splashStartTime = Date.now()
+  mainWin.once('ready-to-show', () => {
+    // Mínimo de 800ms para que la animación de inicio sea perceptible y agradable
+    const elapsed = Date.now() - splashStartTime
+    const delay = Math.max(0, 800 - elapsed)
+
+    setTimeout(() => {
+      if (mainWin && !mainWin.isDestroyed()) {
+        mainWin.show()
+      }
+      if (splashWin && !splashWin.isDestroyed()) {
+        splashWin.close()
+        splashWin = null
+      }
+    }, delay)
+  })
+
+  mainWin.on('closed', () => {
+    mainWin = null
+  })
 }
 
-app.whenReady().then(() => {
-  initDB()
-  createWindow()
+ipcMain.on('splash-close', () => {
+  app.quit()
 })
+
+app.whenReady().then(async () => {
+  createSplashWindow()
+
+  // Pequeña pausa para asegurar montaje visual del splash
+  await new Promise(r => setTimeout(r, 120))
+
+  const enviarEstadoSplash = (msg) => {
+    if (splashWin && !splashWin.isDestroyed() && splashWin.webContents) {
+      splashWin.webContents.send('splash-status', msg)
+    }
+  }
+
+  const enviarErrorSplash = (err) => {
+    if (splashWin && !splashWin.isDestroyed() && splashWin.webContents) {
+      splashWin.webContents.send('splash-error', String(err))
+    }
+  }
+
+  try {
+    enviarEstadoSplash('Conectando base de datos SQLite...')
+    initDB()
+    enviarEstadoSplash('Cargando interfaz de usuario...')
+    createWindow()
+  } catch (err) {
+    console.error('Error al inicializar:', err)
+    enviarErrorSplash(`Error al inicializar la base de datos o migraciones:\n${err.message || err}`)
+  }
+})
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception en proceso principal:', err)
+  if (splashWin && !splashWin.isDestroyed() && splashWin.webContents) {
+    splashWin.webContents.send('splash-error', `Error inesperado del sistema:\n${err.stack || err.message || err}`)
+  }
+})
+
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 
 ipcMain.on('win-minimize', e => BrowserWindow.fromWebContents(e.sender).minimize())

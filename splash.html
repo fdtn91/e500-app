@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciando E500 3D Print</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #F1F5F9;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .splash-card {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(145deg, #0F172A 0%, #080B10 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(34, 197, 94, 0.1);
+      position: relative;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+    .btn-row, .btn-action, #errorBox {
+      -webkit-app-region: no-drag;
+    }
+    .splash-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 20%, rgba(34, 197, 94, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      z-index: 1;
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-ver {
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ADE80;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: #94A3B8;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+    .loading-box {
+      margin: 14px 0 6px;
+      position: relative;
+      z-index: 1;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+    .status-text {
+      color: #CBD5E1;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot-pulse {
+      width: 7px;
+      height: 7px;
+      background: #22C55E;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #22C55E;
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    .progress-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 40%;
+      background: linear-gradient(90deg, #10B981, #22C55E, #4ADE80);
+      border-radius: 999px;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
+      animation: progressIndeterminate 1.6s infinite ease-in-out;
+    }
+    @keyframes progressIndeterminate {
+      0% { transform: translateX(-100%); width: 25%; }
+      50% { width: 55%; }
+      100% { transform: translateX(400%); width: 25%; }
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: #64748B;
+      position: relative;
+      z-index: 1;
+    }
+    /* MODO ERROR */
+    #errorBox {
+      display: none;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-top: 6px;
+      max-height: 110px;
+      overflow-y: auto;
+      z-index: 2;
+    }
+    .error-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #F87171;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .error-msg {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 10px;
+      color: #FECACA;
+      line-height: 1.4;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      justify-content: flex-end;
+    }
+    .btn-action {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: none;
+      transition: opacity .15s;
+    }
+    .btn-action:hover { opacity: 0.85; }
+    .btn-copy { background: #334155; color: #F8FAFC; }
+    .btn-close { background: #DC2626; color: #FFFFFF; }
+  </style>
+</head>
+<body>
+  <div class="splash-card">
+    <div class="header">
+      <img src="Logo_sinsombra.png" alt="Logo" class="logo" />
+      <div>
+        <div class="brand-title">
+          E500 3D Print
+          <span class="badge-ver">v1.0.0</span>
+        </div>
+        <div class="brand-sub">Sistema de Registro y Control de Impresiones 3D</div>
+      </div>
+    </div>
+
+    <!-- Barra de carga normal -->
+    <div class="loading-box" id="loadingBox">
+      <div class="status-row">
+        <span class="status-text">
+          <span class="dot-pulse"></span>
+          <span id="splashStatus">Iniciando sistema...</span>
+        </span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+
+    <!-- Caja de error (oculta por defecto) -->
+    <div id="errorBox">
+      <div class="error-title">
+        <span>⚠️ Error al inicializar la aplicación</span>
+      </div>
+      <div class="error-msg" id="errorText">Ocurrió un error inesperado al cargar la aplicación.</div>
+      <div class="btn-row">
+        <button class="btn-action btn-copy" id="btnCopiar">Copiar error</button>
+        <button class="btn-action btn-close" id="btnCerrar">Cerrar</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Cargando recursos locales...</span>
+      <span>Moonraker & SQLite</span>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron')
+
+    const statusEl  = document.getElementById('splashStatus')
+    const loadBox   = document.getElementById('loadingBox')
+    const errorBox  = document.getElementById('errorBox')
+    const errorText = document.getElementById('errorText')
+
+    ipcRenderer.on('splash-status', (_, msg) => {
+      if (statusEl) statusEl.textContent = msg
+    })
+
+    ipcRenderer.on('splash-error', (_, err) => {
+      if (loadBox) loadBox.style.display = 'none'
+      if (errorBox) errorBox.style.display = 'block'
+      if (errorText) errorText.textContent = String(err || 'Error desconocido')
+    })
+
+    document.getElementById('btnCopiar')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(errorText.textContent).then(() => {
+        alert('Detalle del error copiado al portapapeles.')
+      })
+    })
+
+    document.getElementById('btnCerrar')?.addEventListener('click', () => {
+      ipcRenderer.send('splash-close')
+    })
+  </script>
+</body>
+</html>
