@@ -59,15 +59,14 @@ let mainWin   = null
 
 function createSplashWindow () {
   splashWin = new BrowserWindow({
-    width: 460,
+    width: 480,
     height: 280,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    backgroundColor: '#0B0F19',
     alwaysOnTop: true,
     resizable: false,
     center: true,
-    show: false,
+    show: true,
     icon: path.join(__dirname, 'icono.ico'),
     webPreferences: {
       nodeIntegration: true,
@@ -76,17 +75,12 @@ function createSplashWindow () {
   })
 
   splashWin.loadFile('splash.html')
-  splashWin.once('ready-to-show', () => {
-    if (splashWin && !splashWin.isDestroyed()) {
-      splashWin.show()
-    }
-  })
   splashWin.on('closed', () => {
     splashWin = null
   })
 }
 
-function createWindow () {
+function createWindow (splashStartTime) {
   mainWin = new BrowserWindow({
     width: 1200, height: 760,
     minWidth: 960, minHeight: 640,
@@ -110,11 +104,10 @@ function createWindow () {
     }
   })
 
-  const splashStartTime = Date.now()
   mainWin.once('ready-to-show', () => {
-    // Mínimo de 800ms para que la animación de inicio sea perceptible y agradable
-    const elapsed = Date.now() - splashStartTime
-    const delay = Math.max(0, 800 - elapsed)
+    // Mantener visible el splash al menos 1800ms para que la carga sea clara y agradable
+    const elapsed = Date.now() - (splashStartTime || Date.now())
+    const delay = Math.max(200, 1800 - elapsed)
 
     setTimeout(() => {
       if (mainWin && !mainWin.isDestroyed()) {
@@ -137,10 +130,8 @@ ipcMain.on('splash-close', () => {
 })
 
 app.whenReady().then(async () => {
+  const splashStartTime = Date.now()
   createSplashWindow()
-
-  // Pequeña pausa para asegurar montaje visual del splash
-  await new Promise(r => setTimeout(r, 120))
 
   const enviarEstadoSplash = (msg) => {
     if (splashWin && !splashWin.isDestroyed() && splashWin.webContents) {
@@ -155,10 +146,16 @@ app.whenReady().then(async () => {
   }
 
   try {
+    await new Promise(r => setTimeout(r, 250))
     enviarEstadoSplash('Conectando base de datos SQLite...')
     initDB()
+
+    await new Promise(r => setTimeout(r, 350))
+    enviarEstadoSplash('Verificando registros y configuración...')
+
+    await new Promise(r => setTimeout(r, 300))
     enviarEstadoSplash('Cargando interfaz de usuario...')
-    createWindow()
+    createWindow(splashStartTime)
   } catch (err) {
     console.error('Error al inicializar:', err)
     enviarErrorSplash(`Error al inicializar la base de datos o migraciones:\n${err.message || err}`)

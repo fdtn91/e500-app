@@ -17,8 +17,12 @@ If Not objFSO.FolderExists(strDir & "\node_modules") Then
     objShell.Run "cmd /c npm install --silent", 0, True
 End If
 
-' Lanzar Electron — el 0 oculta completamente la ventana de consola
-objShell.Run "cmd /c npx electron .", 0, False
+' Lanzar Electron directamente usando el binario local para inicio instantáneo
+If objFSO.FileExists(strDir & "\node_modules\.bin\electron.cmd") Then
+    objShell.Run """" & strDir & "\node_modules\.bin\electron.cmd"" .", 0, False
+Else
+    objShell.Run "cmd /c npx electron .", 0, False
+End If
 
 Set objShell = Nothing
 Set objFSO   = Nothing
