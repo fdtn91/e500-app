@@ -599,18 +599,29 @@ tr:hover td{ background:var(--s2); }
         <button class="btn btn-primary" onclick="openModalFil()">+ Nuevo filamento</button>
       </div>
       <div class="page-body">
-        <!-- Sub-tabs por tipo -->
-        <div class="sub-tabs">
-          <button class="sub-tab active" onclick="showFilTab('Todos')"  id="ftab-Todos">Todos</button>
-          <button class="sub-tab"        onclick="showFilTab('PLA')"    id="ftab-PLA">PLA</button>
-          <button class="sub-tab"        onclick="showFilTab('PLA+')"   id="ftab-PLAp">PLA+</button>
-          <button class="sub-tab"        onclick="showFilTab('PETG')"   id="ftab-PETG">PETG</button>
-          <button class="sub-tab"        onclick="showFilTab('Silk')"   id="ftab-Silk">Silk</button>
-        </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-          <button id="btnAgruparMarca" class="btn btn-secondary btn-sm" onclick="toggleAgruparMarca()">
-            🏷 Agrupar por marca
-          </button>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <!-- Sub-tabs por tipo -->
+          <div class="sub-tabs" style="margin-bottom:0;">
+            <button class="sub-tab active" onclick="showFilTab('Todos')"  id="ftab-Todos">Todos</button>
+            <button class="sub-tab"        onclick="showFilTab('PLA')"    id="ftab-PLA">PLA</button>
+            <button class="sub-tab"        onclick="showFilTab('PLA+')"   id="ftab-PLAp">PLA+</button>
+            <button class="sub-tab"        onclick="showFilTab('PETG')"   id="ftab-PETG">PETG</button>
+            <button class="sub-tab"        onclick="showFilTab('TPU')"    id="ftab-TPU">TPU</button>
+            <button class="sub-tab"        onclick="showFilTab('Silk')"   id="ftab-Silk">Silk</button>
+          </div>
+
+          <!-- Barra de controles: Ordenar por restante, Agrupar por marca y Vista Lista/Cards -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button id="btnSortStock" class="btn btn-secondary btn-sm" onclick="toggleSortStock()" style="display:flex;align-items:center;gap:5px;font-weight:600;" title="Ordenar por cantidad de filamento restante">
+              ⚖️ Stock: Normal
+            </button>
+            <button id="btnAgruparMarca" class="btn btn-secondary btn-sm" onclick="toggleAgruparMarca()" style="display:flex;align-items:center;gap:5px;" title="Agrupar materiales por marca">
+              🏷️ Agrupar marca
+            </button>
+            <button id="btnCambiarVista" class="btn btn-secondary btn-sm" onclick="toggleVistaModo()" style="display:flex;align-items:center;gap:5px;font-weight:600;" title="Alternar entre vista de cuadrícula y lista">
+              📑 Vista Lista
+            </button>
+          </div>
         </div>
         <div id="filamentosGrid" style="margin-top:4px;"></div>
       </div>
@@ -1301,25 +1312,105 @@ function showFilTab (tipo) {
 }
 
 let filAgruparMarca = false
+let filSortStock    = 'default' // 'default' (A-Z) | 'asc' (menor a mayor) | 'desc' (mayor a menor)
+let filVistaModo    = localStorage.getItem('e500_fil_vista') || 'grid'
 
 function toggleAgruparMarca () {
   filAgruparMarca = !filAgruparMarca
+  actualizarBtnAgruparMarca()
+  renderFilamentos()
+}
+
+function actualizarBtnAgruparMarca () {
   const btn = document.getElementById('btnAgruparMarca')
   if (btn) {
     btn.style.background    = filAgruparMarca ? 'var(--accent)' : ''
     btn.style.color         = filAgruparMarca ? '#fff' : ''
     btn.style.borderColor   = filAgruparMarca ? 'var(--accent)' : ''
   }
+}
+
+function toggleSortStock () {
+  if (filSortStock === 'default') {
+    filSortStock = 'asc' // Menor restante primero (para identificar bobinas agotándose)
+  } else if (filSortStock === 'asc') {
+    filSortStock = 'desc' // Mayor restante primero
+  } else {
+    filSortStock = 'default' // Orden normal alfabético
+  }
+  actualizarBtnSortStock()
   renderFilamentos()
 }
 
+function actualizarBtnSortStock () {
+  const btn = document.getElementById('btnSortStock')
+  if (!btn) return
+  if (filSortStock === 'asc') {
+    btn.innerHTML = '⬇️ Restante: Menor primero'
+    btn.style.background = 'var(--warn)'
+    btn.style.color = '#000'
+    btn.style.borderColor = 'var(--warn)'
+  } else if (filSortStock === 'desc') {
+    btn.innerHTML = '⬆️ Restante: Mayor primero'
+    btn.style.background = 'var(--accent)'
+    btn.style.color = '#fff'
+    btn.style.borderColor = 'var(--accent)'
+  } else {
+    btn.innerHTML = '⚖️ Stock: Normal'
+    btn.style.background = ''
+    btn.style.color = ''
+    btn.style.borderColor = ''
+  }
+}
+
+function toggleVistaModo () {
+  filVistaModo = filVistaModo === 'grid' ? 'lista' : 'grid'
+  try { localStorage.setItem('e500_fil_vista', filVistaModo) } catch {}
+  actualizarBtnVistaModo()
+  renderFilamentos()
+}
+
+function actualizarBtnVistaModo () {
+  const btn = document.getElementById('btnCambiarVista')
+  if (!btn) return
+  if (filVistaModo === 'lista') {
+    btn.innerHTML = '▦ Vista Cuadrícula'
+    btn.style.background = 'var(--s3)'
+    btn.style.borderColor = 'var(--accent)'
+    btn.style.color = 'var(--accent)'
+    btn.title = 'Cambiar a vista de tarjetas / cuadrícula'
+  } else {
+    btn.innerHTML = '📑 Vista Lista'
+    btn.style.background = ''
+    btn.style.borderColor = ''
+    btn.style.color = ''
+    btn.title = 'Cambiar a vista de lista / tabla'
+  }
+}
+
+function ordenarColeccionFilamentos (items) {
+  const copia = [...items]
+  if (filSortStock === 'asc') {
+    copia.sort((a, b) => (+a.stockGr || 0) - (+b.stockGr || 0))
+  } else if (filSortStock === 'desc') {
+    copia.sort((a, b) => (+b.stockGr || 0) - (+a.stockGr || 0))
+  } else {
+    copia.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', undefined, { numeric: true, sensitivity: 'base' }))
+  }
+  return copia
+}
+
 function renderFilamentos () {
+  actualizarBtnSortStock()
+  actualizarBtnVistaModo()
+  actualizarBtnAgruparMarca()
+
   const grid = document.getElementById('filamentosGrid')
   if (!grid) return
   const data = filTabActual === 'Todos' ? filamentos : filamentos.filter(f => f.tipo === filTabActual)
   
   if (!data.length) {
-    grid.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;">Sin filamentos</div>'
+    grid.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;">Sin filamentos en esta categoría</div>'
     return
   }
 
@@ -1364,26 +1455,116 @@ function renderFilamentos () {
     </div>`
   }).join('')
 
-  let html = '<div class="filamentos-grid">'
+  const renderTable = (items) => {
+    return `
+    <div class="table-wrap" style="background:var(--s1);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:42px;text-align:center;">Color</th>
+            <th>Nombre / Color</th>
+            <th>Tipo</th>
+            <th>Marca</th>
+            <th>Costo / kg</th>
+            <th class="sortable" onclick="toggleSortStock()" title="Clic para alternar orden por restante" style="min-width:210px;">
+              Stock Restante ${filSortStock === 'asc' ? '▲ (Menor)' : filSortStock === 'desc' ? '▼ (Mayor)' : '↕'}
+            </th>
+            <th style="text-align:right;width:210px;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(f => {
+            const pct   = f.pesoBobina > 0 ? Math.round((f.stockGr / f.pesoBobina) * 100) : 0
+            const color = pct > 50 ? 'var(--ok)' : pct > 20 ? 'var(--warn)' : 'var(--error)'
+            const badge = pct > 50 ? 'badge-ok' : pct > 20 ? 'badge-warn' : 'badge-error'
+            const swatchBg = f.colorHex2
+              ? f.colorHex3
+                ? `linear-gradient(135deg,${f.colorHex} 33%,${f.colorHex2} 66%,${f.colorHex3} 100%)`
+                : `linear-gradient(135deg,${f.colorHex} 50%,${f.colorHex2} 50%)`
+              : (f.colorHex || '#888')
+
+            return `
+            <tr>
+              <td style="text-align:center;">
+                <div style="width:22px;height:22px;border-radius:6px;background:${swatchBg};border:1px solid var(--border);margin:0 auto;box-shadow:0 1px 3px rgba(0,0,0,.2);" title="${f.colorNombre || f.nombre}"></div>
+              </td>
+              <td>
+                <div style="font-weight:700;color:var(--text);font-size:12px;">${f.nombre}</div>
+                ${f.notas ? `<div style="font-size:10px;color:var(--muted);margin-top:2px;">${f.notas}</div>` : ''}
+              </td>
+              <td>
+                <span class="badge badge-accent" style="font-size:9px;">${f.tipo}</span>
+              </td>
+              <td style="color:var(--text2);font-size:11px;">
+                ${f.marca || 'Sin marca'}
+              </td>
+              <td class="td-mono" style="color:var(--text2);">
+                $${(+f.costoKg||0).toFixed(0)}/kg
+              </td>
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="flex:1;max-width:110px;height:6px;border-radius:3px;background:var(--border);overflow:hidden;cursor:pointer;" title="Click para ajustar stock" onclick="abrirAjusteStock(${f._idx})">
+                    <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div>
+                  </div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" title="Click para ajustar stock" onclick="abrirAjusteStock(${f._idx})">
+                    ${f.stockGr}gr <span style="font-size:10px;color:${color};font-weight:700;">(${pct}%)</span>
+                  </div>
+                  ${pct <= 20 ? `<span class="badge ${badge}" style="font-size:8px;">${pct === 0 ? 'Agotado' : 'Bajo'}</span>` : ''}
+                </div>
+              </td>
+              <td style="text-align:right;">
+                <div class="td-actions" style="justify-content:flex-end;">
+                  <button class="btn btn-primary btn-sm" style="font-size:10px;padding:3px 7px;font-weight:600;" onclick="abrirAjusteStock(${f._idx})" title="Ajustar stock">⚖️ Stock</button>
+                  <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 7px;font-weight:600;" onclick="abrirComparadorFilamento(${f._idx})" title="Comparar precios en Mercado Libre y Amazon México">🛒 Precios</button>
+                  <button class="btn btn-secondary btn-sm" style="font-size:10px;padding:3px 6px;" onclick="editFilamento(${f._idx})" title="Editar">Editar</button>
+                  <button class="btn btn-danger btn-sm" style="font-size:10px;padding:3px 6px;" onclick="deleteFilamento('${f.nombre}')" title="Eliminar">✕</button>
+                </div>
+              </td>
+            </tr>`
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`
+  }
+
+  let html = ''
 
   if (filAgruparMarca) {
-    // Agrupado por marca
     const grupos = {}
     data.forEach(f => {
       const marca = f.marca || 'Sin marca'
       if (!grupos[marca]) grupos[marca] = []
       grupos[marca].push(f)
     })
-    Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([marca, items]) => {
-      html += `<div class="fil-grupo-header">📦 ${marca} <span style="font-weight:400;color:var(--muted)">(${items.length})</span></div>`
-      html += renderCards(items)
-    })
+
+    if (filVistaModo === 'lista') {
+      html = '<div style="display:flex;flex-direction:column;gap:12px;">'
+      Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([marca, items]) => {
+        const itemsOrdenados = ordenarColeccionFilamentos(items)
+        html += `<div>
+          <div class="fil-grupo-header" style="margin-bottom:6px;">📦 ${marca} <span style="font-weight:400;color:var(--muted)">(${items.length} filamentos)</span></div>
+          ${renderTable(itemsOrdenados)}
+        </div>`
+      })
+      html += '</div>'
+    } else {
+      html = '<div class="filamentos-grid">'
+      Object.entries(grupos).sort(([a],[b]) => a.localeCompare(b)).forEach(([marca, items]) => {
+        const itemsOrdenados = ordenarColeccionFilamentos(items)
+        html += `<div class="fil-grupo-header">📦 ${marca} <span style="font-weight:400;color:var(--muted)">(${items.length})</span></div>`
+        html += renderCards(itemsOrdenados)
+      })
+      html += '</div>'
+    }
   } else {
-    // Sin agrupación
-    html += renderCards(data)
+    const dataOrdenada = ordenarColeccionFilamentos(data)
+    if (filVistaModo === 'lista') {
+      html = renderTable(dataOrdenada)
+    } else {
+      html = `<div class="filamentos-grid">${renderCards(dataOrdenada)}</div>`
+    }
   }
 
-  html += '</div>'
   grid.innerHTML = html
 }
 
